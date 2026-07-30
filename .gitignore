@@ -1,0 +1,27 @@
+# Python / uv environment
+.venv/
+__pycache__/
+*.py[cod]
+
+# Learned models and temporary outputs
+models/
+outputs/
+
+# Local datasets and recordings
+lerobot_data/
+videos/
+*.mp4
+*.rrd
+
+# Secrets
+.env
+.env.*
+*.token
+hf_token*
+secrets/
+
+# OS / editor files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
