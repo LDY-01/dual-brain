@@ -2,7 +2,7 @@
 
 SO101 리더-팔로워 로봇을 사용해 **렌즈 뚜껑을 열린 상자 안에 넣는 작업**을 시연 데이터로 학습시키고, 학습된 ACT 정책으로 팔로워암을 자율 실행하는 프로젝트입니다.
 
-> 이 문서는 2026-07-30 기준의 작업 기록과 재현 절차입니다. 실제 로봇을 움직이기 전에 항상 주변을 비우고, 비정상 진동이나 충돌이 발생하면 팔로워의 12V 전원을 즉시 분리합니다.
+> 이 문서는 2026-07-31 기준의 작업 기록과 재현 절차입니다. 실제 로봇을 움직이기 전에 항상 주변을 비우고, 비정상 진동이나 충돌이 발생하면 팔로워의 12V 전원을 즉시 분리합니다.
 
 ## 현재 상태
 
@@ -11,20 +11,27 @@ SO101 리더-팔로워 로봇을 사용해 **렌즈 뚜껑을 열린 상자 안�
 - 데이터셋 `DY-01/lens_cap_into_box_v3` 수집·검수·Hugging Face 업로드 완료
 - ACT 모델 `act_lens_cap_v1` 학습 완료
 - 팔로워암 단독 자율 실행(rollout) 확인 완료
+- 실행 환경을 Windows에서 macOS로 이전
+  - follower 포트: `/dev/tty.usbmodem5B140307781`
+  - 전방 카메라: OpenCV index `0`
+  - Windows에서 사용한 follower 캘리브레이션 파일 이전 완료
 - 평가용 rollout 데이터셋을 수집 중
-  - 정상 완료 에피소드: 9개
-  - 중간 종료된 부분 에피소드: 1개 (성공률 산정 전에 제거 필요)
+  - Windows 기록: 정상 완료 에피소드 9개, 중간 종료된 부분 에피소드 1개
+  - macOS 예비 테스트에서는 성공률이 약 10%로 관찰됐으나 정식 평가 전이므로 확정값이 아님
+  - 뚜껑 위치가 학습 위치에서 조금만 벗어나도 집기에 실패하고, 그리퍼에 뚜껑을 보정해 주면 상자에 넣는 후반 동작은 수행함
 
 현재 모델은 작업 방향을 일부 재현하지만, 로컬 CPU 추론이 느리고 관절 명령이 안전 제한에 자주 걸립니다. 따라서 현재 단계의 목적은 **모델의 실제 성공률을 측정하고 실패 원인을 분류하는 것**입니다.
 
 ## 하드웨어 구성
 
-| 구성품 | 역할 | 현재 설정 |
+| 구성품 | 역할 | 현재 macOS 설정 |
 |---|---|---|
-| SO101 follower | 자율 실행 팔 | USB `COM3`, 별도 12V 전원 |
-| SO101 leader | 시연 데이터 수집용 팔 | USB `COM5` (자율 실행에는 불필요) |
+| SO101 follower | 자율 실행 팔 | `/dev/tty.usbmodem5B140307781`, 별도 12V 전원 |
+| SO101 leader | 시연 데이터 수집용 팔 | 아직 macOS 포트 미확인 (자율 실행에는 불필요) |
 | Feetech STS3215-12V | 팔로워 관절 서보 6개 | ID 1~6 |
-| Innomaker U20CAM-720P | 전방 카메라 | OpenCV index `1`, 640x480, 30 FPS |
+| Innomaker U20CAM-720P | 전방 카메라 | OpenCV index `0`, 640x480, 30 FPS |
+
+이전 Windows 설정은 follower `COM3`, leader `COM5`, 전방 카메라 index `1`이었습니다.
 
 팔로워 관절 ID는 다음과 같습니다.
 
@@ -39,18 +46,19 @@ SO101 리더-팔로워 로봇을 사용해 **렌즈 뚜껑을 열린 상자 안�
 
 ### 연결 원칙
 
-- 팔로워 USB 포트와 리더 USB 포트는 항상 같은 허브 위치를 사용합니다.
-- 카메라는 현재 허브가 아닌 노트북에 직접 연결합니다. OpenCV 카메라 index는 물리적 연결 순서에 따라 바뀔 수 있으므로, 연결 구성을 바꾼 뒤에는 반드시 다시 확인합니다.
+- 포트 이름과 OpenCV 카메라 index는 OS와 물리적 연결 순서에 따라 바뀔 수 있으므로, 연결 구성을 바꾼 뒤에는 반드시 다시 확인합니다.
+- 현재 MacBook에는 USB-A 포트가 없어 카메라를 USB-C 허브에 연결합니다. 프레임 시간초과가 발생하면 다른 장치를 분리하거나, 로봇과 카메라를 서로 다른 USB-C 포트/허브로 나누거나, 전원형 허브를 사용합니다.
 - 자율 실행 시에는 팔로워와 카메라만 연결합니다. 리더암은 필요하지 않습니다.
 - 관절을 손으로 만지거나 케이블을 만질 때는 팔로워 12V 전원을 먼저 분리합니다.
 
 ## 개발 환경
 
-- OS: Windows
+- 현재 실행 OS: macOS (Apple Silicon)
+- 이전 실행 OS: Windows
 - Python: 3.12
 - 패키지 관리: `uv`
 - LeRobot: `0.6.0`
-- 로컬 자율 실행 장치: CPU (현재 설치된 PyTorch에서 CUDA를 사용하지 못함)
+- 로컬 자율 실행 장치: CPU
 - 학습 환경: Google Colab Tesla T4 GPU
 
 프로젝트 의존성은 다음 파일에서 관리합니다.
@@ -61,30 +69,27 @@ SO101 리더-팔로워 로봇을 사용해 **렌즈 뚜껑을 열린 상자 안�
 
 프로젝트 명령은 항상 이 폴더에서 실행합니다.
 
-```powershell
-cd "<프로젝트 폴더>"
+```bash
+cd /Users/doyounglim/Desktop/SO101
 ```
 
 ## 캘리브레이션
 
 리더와 팔로워는 각각 별도로 캘리브레이션합니다. 기존 캘리브레이션이 있으면, 재실행 시 표시되는 질문에서 `Enter`를 눌러 기존 파일을 사용합니다. `c`를 입력하면 새 캘리브레이션이 시작됩니다.
 
-```powershell
-# 팔로워
-uv run lerobot-calibrate --robot.type=so101_follower --robot.port=COM3 --robot.id=so101_follower
+현재 follower는 Windows에서 실제 학습·실행에 사용한 캘리브레이션 파일을 다음 macOS 경로로 이전해 사용합니다.
 
-# 리더
-uv run lerobot-calibrate --teleop.type=so101_leader --teleop.port=COM5 --teleop.id=so101_leader
+```text
+/Users/doyounglim/.cache/huggingface/lerobot/calibration/robots/so_follower/so101_follower.json
 ```
+
+실행 중 기존 캘리브레이션을 사용할지 묻는 경우 `Enter`를 누릅니다. `c`를 누르면 현재 파일을 새 캘리브레이션으로 덮어쓰므로, 모터 교체나 조립 변경처럼 재캘리브레이션이 필요한 경우가 아니면 누르지 않습니다.
 
 팔로워의 3번 서보(`elbow_flex`)는 내부 기어 파손으로 교체했으며, 교체 후 ID 3 설정과 팔로워 재캘리브레이션을 완료했습니다.
 
 ## 카메라·포트 확인
 
-```powershell
-# 연결된 시리얼 포트 확인
-[System.IO.Ports.SerialPort]::GetPortNames()
-
+```bash
 # 카메라 index 확인
 uv run lerobot-find-cameras opencv
 
@@ -92,7 +97,7 @@ uv run lerobot-find-cameras opencv
 uv run lerobot-find-port
 ```
 
-현재 작업 카메라는 `Camera #1`입니다. 다만 카메라를 다른 USB 포트로 옮겼다면 결과를 확인한 뒤 모든 명령의 `index_or_path` 값을 바꿔야 합니다.
+현재 macOS 작업 카메라는 `Camera #0`입니다. 카메라를 다른 USB 포트로 옮겼다면 결과를 확인한 뒤 모든 명령의 `index_or_path` 값을 바꿔야 합니다.
 
 ## 시연 데이터셋
 
@@ -179,8 +184,8 @@ models/act_lens_cap_v1/
 
 자율 실행에는 팔로워와 카메라만 사용합니다. 실행 전에 카메라 구도, 상자·뚜껑 위치, 팔의 시작 자세를 학습 데이터 수집 시점과 최대한 일치시킵니다.
 
-```powershell
-uv run lerobot-rollout --strategy.type=base --policy.path="<프로젝트 폴더>\models\act_lens_cap_v1" --device=cpu --robot.type=so101_follower --robot.port=COM3 --robot.id=so101_follower --robot.max_relative_target=5 --robot.cameras="{ front: {type: opencv, index_or_path: 1, width: 640, height: 480, fps: 30}}" --task="Place the lens cap into the open box." --duration=30 --display_data=false
+```bash
+uv run lerobot-rollout --strategy.type=base --policy.path=/Users/doyounglim/Desktop/SO101/models/act_lens_cap_v1 --device=cpu --robot.type=so101_follower --robot.port=/dev/tty.usbmodem5B140307781 --robot.id=so101_follower --robot.max_relative_target=5 --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}}" --task="Place the lens cap into the open box." --duration=30 --display_data=false
 ```
 
 `--robot.max_relative_target=5`는 한 번에 너무 큰 관절 명령이 들어올 때 제한하는 안전장치입니다. 경고가 나오더라도 값을 높이거나 제거하지 않습니다.
@@ -191,8 +196,8 @@ LeRobot 0.6.0에서는 `lerobot-record`가 리더암 시연 수집용입니다. 
 
 평가 데이터셋 이름은 반드시 `rollout_`으로 시작해야 합니다.
 
-```powershell
-uv run lerobot-rollout --strategy.type=episodic --policy.path="<프로젝트 폴더>\models\act_lens_cap_v1" --device=cpu --robot.type=so101_follower --robot.port=COM3 --robot.id=so101_follower --robot.max_relative_target=5 --robot.cameras="{ front: {type: opencv, index_or_path: 1, width: 640, height: 480, fps: 30}}" --task="Place the lens cap into the open box." --dataset.repo_id=DY-01/rollout_act_lens_cap_v1 --dataset.root="<평가 데이터 폴더>" --dataset.single_task="Place the lens cap into the open box." --dataset.fps=30 --dataset.num_episodes=1 --dataset.episode_time_s=30 --dataset.reset_time_s=10 --dataset.video=true --dataset.push_to_hub=false --dataset.streaming_encoding=false --dataset.encoder_threads=1 --strategy.reset_to_initial_position=true --display_data=false
+```bash
+uv run lerobot-rollout --strategy.type=episodic --policy.path=/Users/doyounglim/Desktop/SO101/models/act_lens_cap_v1 --device=cpu --robot.type=so101_follower --robot.port=/dev/tty.usbmodem5B140307781 --robot.id=so101_follower --robot.max_relative_target=5 --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}}" --task="Place the lens cap into the open box." --dataset.repo_id=DY-01/rollout_act_lens_cap_v1_mac --dataset.root=/Users/doyounglim/Desktop/SO101/lerobot_data/rollout_act_lens_cap_v1_mac --dataset.single_task="Place the lens cap into the open box." --dataset.fps=30 --dataset.num_episodes=10 --dataset.episode_time_s=30 --dataset.reset_time_s=10 --dataset.video=true --dataset.push_to_hub=false --dataset.streaming_encoding=false --dataset.encoder_threads=1 --strategy.reset_to_initial_position=true --display_data=false
 ```
 
 ### 평가 진행 방식
@@ -202,7 +207,7 @@ uv run lerobot-rollout --strategy.type=episodic --policy.path="<프로젝트 폴
 3. 영상 검수 후 성공 여부를 표시합니다.
 4. 성공률은 `성공 에피소드 수 / 완전한 평가 에피소드 수`로 계산합니다.
 
-현재 CPU 추론 속도는 약 3~5Hz 경고가 발생할 수 있습니다. 또한 이전에는 허브 연결 카메라와 실시간 AV1 인코딩을 함께 사용할 때 카메라 프레임 시간초과가 발생했습니다. 현재 카메라는 노트북에 직접 연결하고, 평가 중에는 `--display_data=false`, `--dataset.streaming_encoding=false`를 사용합니다.
+현재 CPU 추론 속도는 약 3~5Hz 경고가 발생할 수 있습니다. USB-C 허브 연결 카메라에서 프레임 시간초과가 발생할 수 있으므로 다른 USB 장치를 최소화하고, 평가 중에는 `--display_data=false`, `--dataset.streaming_encoding=false`를 사용합니다.
 
 ### 평가 중 키 조작
 
@@ -222,7 +227,7 @@ uv run lerobot-edit-dataset --repo_id=DY-01/rollout_act_lens_cap_v1 --root="<평
 
 | 증상 | 원인 또는 상태 | 대응 |
 |---|---|---|
-| `OpenCVCamera(1) latest frame is too old` | 카메라 프레임이 0.5초 이상 갱신되지 않음 | 카메라를 노트북에 직접 연결하고, Rerun·실시간 인코딩을 끈 뒤 짧은 평가부터 재시도 |
+| `OpenCVCamera(0) read failed` 또는 frame timeout | 허브 대역폭·전력 부족, 카메라 점유 또는 프레임 갱신 실패 | 카메라 앱을 종료하고 USB를 재연결합니다. 다른 USB 장치를 줄이거나 로봇과 카메라를 다른 포트/전원형 허브로 분리합니다. |
 | `Record loop is running slower` | 로컬 CPU 추론이 목표 30Hz보다 느림 | 성능 평가에 기록하고, 향후 CUDA 가능 PC 또는 더 가벼운 실행 환경 검토 |
 | `Relative goal position ... clamped` | 정책이 큰 관절 이동을 예측함 | `max_relative_target=5` 유지, 절대 제한을 풀지 않음 |
 | `Could not write TorqueEnable on id=5` | wrist_roll 모터 통신/토크 설정이 일시 실패 | 12V·USB를 재연결하고 기존 캘리브레이션 파일로 연결 점검 |
@@ -230,9 +235,9 @@ uv run lerobot-edit-dataset --repo_id=DY-01/rollout_act_lens_cap_v1 --root="<평
 
 ## 다음 단계
 
-1. 평가 데이터셋의 부분 에피소드 1개를 삭제해 완전한 9개만 남깁니다.
-2. 동일 조건에서 완전한 평가 1개를 추가해 총 10개를 만듭니다.
-3. 10개 영상을 검수해 성공·실패를 표시하고 ACT v1의 실제 성공률을 계산합니다.
+1. macOS의 동일 조건에서 완전한 평가 10개를 새로 수집합니다.
+2. 10개 영상을 검수해 성공·실패를 표시하고 ACT v1의 실제 성공률을 계산합니다.
+3. 뚜껑 위치를 고정한 평가와 위치를 조금씩 바꾼 평가를 구분합니다.
 4. 실패 양상을 분류합니다.
    - 시작 자세·카메라 구도 불일치
    - 느린 CPU 추론
