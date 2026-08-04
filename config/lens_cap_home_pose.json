@@ -1,0 +1,12 @@
+{
+  "task": "Place the lens cap into the open box.",
+  "recorded_at": "2026-08-04T09:58:54+09:00",
+  "pose": {
+    "shoulder_pan": -4.31,
+    "shoulder_lift": -104.35,
+    "elbow_flex": 21.93,
+    "wrist_flex": 100.53,
+    "wrist_roll": 89.63,
+    "gripper": 26.06
+  }
+}
