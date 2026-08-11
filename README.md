@@ -129,7 +129,22 @@ DAgger(Dataset Aggregation)는 선생의 성공 궤적만 한 번 학습하고 �
 - 미지의 몸 자기 발견 실험
 - Whisper STT와 TTS를 연결한 음성·채팅 콕핏
 
-시뮬레이션 참고 구현의 핵심 코드와 실행 자산은 이 저장소의 [`kwon_lab/`](./kwon_lab)에 포함되어 있습니다. 원본은 [`kihyeonkwon/lerobot-kwonlab`](https://github.com/kihyeonkwon/lerobot-kwonlab)이며, 검증 당시에는 upstream LeRobot 커밋 `a9879e69` 위에 `kwon_lab/`을 얹어 실행했습니다. 현재 저장소의 LeRobot 0.6.0 환경과의 완전한 호환성은 별도 검증이 필요합니다. 데이터셋·정책 체크포인트·원본 MP4는 저장소에 포함하지 않고 로컬에서 재생성합니다.
+시뮬레이션 참고 구현의 핵심 코드와 실행 자산은 이 저장소의 [`kwon_lab/`](./kwon_lab)에 포함되어 있습니다. 원본은 [`kihyeonkwon/lerobot-kwonlab`](https://github.com/kihyeonkwon/lerobot-kwonlab)이며, 검증 당시에는 upstream LeRobot 커밋 `a9879e69` 위에 `kwon_lab/`을 얹어 실행했습니다. 현재 저장소의 LeRobot 0.6.0 환경에서는 아래 Stage 0 범위까지 호환성을 확인했습니다. 데이터셋·정책 체크포인트·원본 MP4는 저장소에 포함하지 않고 로컬에서 재생성합니다.
+
+### 통합 실행 검증 — Stage 0
+
+2026-08-11에 Windows, Python 3.12, LeRobot 0.6.0, MuJoCo 3.11 환경에서 다음 항목을 검증했습니다.
+
+- 한글이 포함된 Windows 경로에서도 MJCF와 상대 자산을 메모리 폴백으로 로드
+- MuJoCo 환경 리셋, 블록 랜덤화, 640×480 손목캠 렌더링, 관절 상태 관측
+- DLS IK 이동: 테스트 목표에서 최종 위치 오차 1.49mm
+- 동일 시드의 `pick()` 성공 및 `place()` 물리 실행
+- 자율 데이터 생성기 전체 실행: 5회 시도 중 성공 에피소드 1개, 193프레임, 25FPS
+- LeRobotDataset 0.6.0 형식의 Parquet·MP4·메타데이터 저장
+- ACT 0.6.0 정책·전처리 로더 API 호환성 확인
+- System 2의 ACT 로더 호출 인자 오류 수정 및 체크포인트 누락 오류 메시지 추가
+
+정책 체크포인트는 저장소에 포함되지 않으므로 실제 ACT 가중치 로드와 롤아웃은 체크포인트를 학습하거나 별도로 배치한 뒤 검증합니다. Stage 0의 환경·IK·레시피·데이터 생성 경로는 현재 저장소에서 실행 가능합니다.
 
 ## 그랩 개발에서 얻은 교훈
 

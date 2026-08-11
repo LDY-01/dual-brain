@@ -350,12 +350,14 @@ def _run_student(checkpoint: str = "015000", max_steps: int = 300):
     import torch
 
     from eval.eval_act_pick import (
-        BLOCK_ON_TABLE_Z, SETTLE_STEPS, load_policy, obs_to_batch,
+        BLOCK_ON_TABLE_Z, REPO_ROOT, SETTLE_STEPS, VERSIONS, load_policy,
+        obs_to_batch,
     )
 
     if checkpoint not in _student:
         device = "mps" if torch.backends.mps.is_available() else "cpu"
-        _student[checkpoint] = load_policy(checkpoint, device)
+        ckpt_root = REPO_ROOT / VERSIONS["v1"][0]
+        _student[checkpoint] = load_policy(checkpoint, device, ckpt_root)
     policy, pre, post = _student[checkpoint]
 
     # 학습 분포 맞추기: 데이터가 전부 홈 자세 시작이므로 팔을 홈으로 복귀

@@ -44,10 +44,15 @@ BLOCK_ON_TABLE_Z = 0.05  # 블록 중심이 이보다 낮아야 "내려놓음" (
 
 
 def load_policy(step: str, device: str, ckpt_root):
+    path = Path(ckpt_root) / step / "pretrained_model"
+    if not path.is_dir():
+        raise FileNotFoundError(
+            f"ACT checkpoint not found: {path}. "
+            "Train a policy first or pass the matching checkpoint root."
+        )
     from lerobot.policies.act.modeling_act import ACTPolicy
     from lerobot.policies.factory import make_pre_post_processors
 
-    path = ckpt_root / step / "pretrained_model"
     policy = ACTPolicy.from_pretrained(str(path))
     policy.to(device).eval()
     pre, post = make_pre_post_processors(

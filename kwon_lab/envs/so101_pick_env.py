@@ -27,6 +27,24 @@ BLOCK_Y = (-0.10, 0.10)
 SUCCESS_RADIUS = 0.04  # m
 
 
+def load_mj_model(xml_path):
+    """Load MJCF even when its Windows path contains non-ASCII characters."""
+    path = Path(xml_path).resolve()
+    try:
+        return mujoco.MjModel.from_xml_path(str(path))
+    except ValueError as exc:
+        if "Error opening file" not in str(exc):
+            raise
+        assets = {
+            asset.relative_to(path.parent).as_posix(): asset.read_bytes()
+            for asset in path.parent.rglob("*")
+            if asset.is_file()
+        }
+        return mujoco.MjModel.from_xml_string(
+            path.read_text(encoding="utf-8"), assets=assets
+        )
+
+
 def camera_gravity(model, data, camera_name):
     """카메라 프레임 기준 중력(아래) 방향 — 카메라에 IMU가 달린 것과 동일.
     반환 벡터: x=이미지 오른쪽, y=이미지 위, z=카메라 뒤쪽(시선 반대) 성분."""
@@ -47,7 +65,7 @@ class SO101PickEnv(gym.Env):
     metadata = {"render_modes": ["rgb_array"], "render_fps": 25}
 
     def __init__(self, render_size=(480, 640), control_hz=25, camera="front"):
-        self.model = mujoco.MjModel.from_xml_path(str(SCENE_XML))
+        self.model = load_mj_model(SCENE_XML)
         self.data = mujoco.MjData(self.model)
         self.camera = camera
         h, w = render_size
