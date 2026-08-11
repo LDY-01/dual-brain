@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import numpy as np
 
-from envs.so101_pick_env import SO101PickEnv, SUCCESS_RADIUS
+from envs.so101_pick_env import SO101PickEnv
 from skills.aiming import aim_at
 from skills.primitives import pick, place
 
@@ -66,7 +66,7 @@ def main():
         success = False
         if grasped:
             placed, info = place(env, info["target_pos"][:2])
-            success = info["dist_to_target"] < SUCCESS_RADIUS
+            success = info["success"]
 
         if success:
             for fr in env.recorder:

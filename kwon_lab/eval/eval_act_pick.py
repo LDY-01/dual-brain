@@ -6,7 +6,7 @@ System 2(LLM 직접 제어)와의 비교가 이 프로젝트의 핵심 증거물
 - 관측 키를 학습 데이터셋과 동일하게 구성 (observation.images.front / observation.state)
 - 전처리 파이프라인(정규화 통계)은 체크포인트에서 로드 — 학습과 똑같이 적용
 - 평가 시드는 5000번대: 학습 데이터(1000번대)에 없던 블록 위치만 사용
-- 성공 판정: 블록이 목표 4cm 이내 + 테이블 위(높이<5cm) + 10스텝 연속 유지
+- 성공 판정: 블록 바닥 면적 75% 이상이 목표 구역 안 + 테이블 위 + 10스텝 연속 유지
 
 실행:  .venv/bin/python kwon_lab/eval/eval_act_pick.py [--step 015000] [--episodes 20]
 출력:  콘솔 성공률 표 + outputs/eval/act_pick_v1/<step>/ 롤아웃 영상(처음 3개+실패 3개)
@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import numpy as np
 import torch
 
-from envs.so101_pick_env import SO101PickEnv, SUCCESS_RADIUS
+from envs.so101_pick_env import SO101PickEnv
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 # --version 인자로 v1(front·구관측)/v2(wrist·에고센트릭) 선택
@@ -40,7 +40,6 @@ VERSIONS = {
 AIM_START = {"v2.1", "v2.2"}
 MAX_STEPS = 300          # 25Hz × 12초 — 레시피 시연(~7초)보다 넉넉하게
 SETTLE_STEPS = 10        # 성공 상태가 이만큼 연속 유지돼야 인정 (스쳐 지나감 방지)
-BLOCK_ON_TABLE_Z = 0.05  # 블록 중심이 이보다 낮아야 "내려놓음" (들고 있으면 더 높음)
 
 
 def load_policy(step: str, device: str, ckpt_root):
@@ -93,8 +92,7 @@ def rollout(env, policy, pre, post, seed: int, aim=False):
         obs, _, _, _, info = env.step(action)
         frames.append(obs["pixels"])
 
-        ok = (info["dist_to_target"] < SUCCESS_RADIUS
-              and info["block_height"] < BLOCK_ON_TABLE_Z)
+        ok = info["success"]
         settled = settled + 1 if ok else 0
         if settled >= SETTLE_STEPS:
             return True, t + 1, info, frames

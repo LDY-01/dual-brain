@@ -145,4 +145,4 @@ def place(env, target_xy, frames=None):
     if frames is not None: frames += f
     _, _, f2 = move_to(env, [target_xy[0], target_xy[1], 0.20], duration=0.8)
     if frames is not None: frames += f2
-    return info["dist_to_target"] < 0.05, info
+    return info["success"], info

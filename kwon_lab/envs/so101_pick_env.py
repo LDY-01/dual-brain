@@ -5,7 +5,7 @@
 
 - 관측: {"pixels": (H,W,3) uint8 고정 카메라, "agent_pos": (6,) 관절각 rad}
 - 액션: (6,) 목표 관절각 rad — MJCF의 position 액추에이터가 추종
-- 성공: 블록 중심이 목표 구역 중심 4cm 이내
+- 성공: 블록 바닥 면적의 75% 이상이 목표 구역 안에 있고 테이블에 내려놓인 상태
 """
 
 from pathlib import Path
@@ -24,7 +24,8 @@ BLOCK_HALF_H = 0.03  # 4x4x6cm 박스 (Menagerie 검증 스펙)
 # 블록 스폰 구역 (홈 자세 그리퍼 (0.29, 0) 기준 손 닿는 범위)
 BLOCK_X = (0.18, 0.28)
 BLOCK_Y = (-0.10, 0.10)
-SUCCESS_RADIUS = 0.04  # m
+SUCCESS_COVERAGE = 0.75  # 블록 바닥 면적 중 목표 구역에 포함돼야 하는 비율
+BLOCK_ON_TABLE_Z = 0.05  # 블록 중심이 이보다 낮아야 실제로 내려놓은 것으로 판정
 
 
 def load_mj_model(xml_path):
@@ -78,7 +79,21 @@ class SO101PickEnv(gym.Env):
             mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, "block_free")
         ]
         self.block_body = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "block")
+        self.block_geom = mujoco.mj_name2id(
+            self.model, mujoco.mjtObj.mjOBJ_GEOM, "block_geom"
+        )
         self.target_site = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, "target_zone")
+
+        # 블록 바닥 면적의 목표 구역 포함률을 고정 격자로 근사한다. 격자 중심을
+        # 사용해 경계 편향을 줄이고, 블록의 현재 yaw 회전도 반영한다.
+        grid_n = 61
+        axis = (np.arange(grid_n, dtype=float) + 0.5) / grid_n * 2.0 - 1.0
+        gx, gy = np.meshgrid(axis, axis, indexing="xy")
+        half_xy = self.model.geom_size[self.block_geom, :2]
+        self._block_footprint = np.column_stack(
+            [gx.ravel() * half_xy[0], gy.ravel() * half_xy[1]]
+        )
+        self._target_radius = float(self.model.site_size[self.target_site, 0])
 
         ctrl = self.model.actuator_ctrlrange  # (6, 2)
         self.action_space = spaces.Box(
@@ -141,7 +156,7 @@ class SO101PickEnv(gym.Env):
             self._last_step_t = time.time()
 
         info = self._get_info()
-        success = info["dist_to_target"] < SUCCESS_RADIUS
+        success = info["success"]
         reward = 1.0 if success else 0.0
         return self._get_obs(), reward, bool(success), False, info
 
@@ -163,11 +178,21 @@ class SO101PickEnv(gym.Env):
         """특권 상태 — System 2 피드백과 성공 판정에 사용 (시뮬 전용)."""
         block = self.data.xpos[self.block_body]
         target = self.data.site_xpos[self.target_site]
+        rotation_xy = self.data.xmat[self.block_body].reshape(3, 3)[:2, :2]
+        footprint_world = block[:2] + self._block_footprint @ rotation_xy.T
+        coverage = float(np.mean(
+            np.linalg.norm(footprint_world - target[:2], axis=1) <= self._target_radius
+        ))
+        block_height = float(block[2])
         return {
             "block_pos": block.copy(),
             "target_pos": target.copy(),
             "dist_to_target": float(np.linalg.norm(block[:2] - target[:2])),
-            "block_height": float(block[2]),
+            "target_coverage": coverage,
+            "block_height": block_height,
+            "success": bool(
+                coverage >= SUCCESS_COVERAGE and block_height < BLOCK_ON_TABLE_Z
+            ),
             "gripper_pos": self.data.xpos[
                 mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "gripper")
             ].copy(),
