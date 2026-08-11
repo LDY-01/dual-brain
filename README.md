@@ -609,14 +609,19 @@ Isaac Sim과 Isaac Lab은 당장의 다음 단계가 아니라 향후 전환 후
 5. MuJoCo 결과가 안정되면 실물 SO-101에서 sim-to-real 격차를 측정하고 소량의 실물 데이터로 보정합니다.
 6. 대규모 병렬 학습이나 시각 도메인 랜덤화가 실제 병목이 될 때 Isaac Sim·Isaac Lab 전환을 재검토합니다.
 
-## GitHub에 포함하지 않는 항목
+## GitHub 아티팩트 관리
 
-다음 항목은 `.gitignore`로 제외합니다.
+재현에 필요한 학습 데이터와 ACT 체크포인트는 [`artifacts/`](./artifacts)에 선별해
+Git LFS로 관리합니다. `*.safetensors`, `*.mp4`, `*.parquet` 등 대용량 파일은
+`.gitattributes`의 LFS 규칙을 따르며, 설정 JSON과 메타데이터는 일반 Git에 저장합니다.
 
-- `.venv/`
-- `models/`의 대용량 모델 가중치
-- `outputs/`의 임시 카메라 이미지
-- 원본 동영상 및 로컬 데이터셋
-- Hugging Face 토큰, `.env`, 기타 비밀 정보
+다음 항목은 계속 `.gitignore`로 제외합니다.
 
-GitHub에는 코드, 의존성 파일, 실행·학습 문서, 결과 요약만 보관합니다.
+- `.venv/`와 Python 캐시
+- 실행 중 계속 덮어쓰는 `outputs/`
+- 정리되지 않은 로컬 `models/`, `lerobot_data/`, 임시 영상
+- Hugging Face 토큰, API 키, `.env`, 기타 비밀 정보
+
+업로드할 때는 `outputs/` 전체를 그대로 커밋하지 않고, 재현에 필요한 최종 데이터셋과
+체크포인트만 `artifacts/`로 복사해 검수 후 커밋합니다. 이렇게 하면 코드 저장소의
+구조를 유지하면서 GitHub clone/pull만으로 필요한 실험 자산도 받을 수 있습니다.
