@@ -12,6 +12,13 @@ ARM_JOINTS = ["shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wris
 EE_SITE = "gripperframe"
 GRIPPER_OPEN, GRIPPER_CLOSED = 1.5, 0.1  # gripper 관절각 (rad)
 
+# Placement trajectory defaults. The commanded end-effector height is not the
+# same as the block-bottom height; a 6 cm EE target leaves the carried block
+# about 2.2 cm above the table in the fixed-seed benchmark.
+PLACE_RELEASE_HEIGHT = 0.06
+PLACE_APPROACH_HEIGHT = 0.14
+PLACE_RETREAT_HEIGHT = 0.14
+
 
 def _skew(v):
     return np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
@@ -106,6 +113,17 @@ def set_gripper(env, value, duration=0.6):
     return info, frames
 
 
+def hold_position(env, duration=0.2):
+    """Hold the current command so the arm or released object can settle."""
+    frames, info = [], env._get_info()
+    n_steps = max(1, int(duration * env.metadata["render_fps"]))
+    action = env.data.ctrl.copy()
+    for _ in range(n_steps):
+        obs, _, _, _, info = env.step(action)
+        frames.append(obs["pixels"])
+    return info, frames
+
+
 # ── 상위 스킬: 오늘 검증된 그랩 레시피를 함수로 봉인 ──────────
 
 POCKET_OFFSET = np.array([-0.03, 0.0, 0.01])  # 실측: 포켓 중심의 site계 오프셋
@@ -137,12 +155,49 @@ def pick(env, block_pos, frames=None):
     return info["block_height"] > 0.08, info
 
 
-def place(env, target_xy, frames=None):
-    """쥔 물체를 목표 지점 위로 옮겨 놓는다."""
-    _, _, f = move_to(env, [target_xy[0], target_xy[1], 0.12], duration=1.5)
+def place(env, target_xy, frames=None, release_height=PLACE_RELEASE_HEIGHT):
+    """쥔 물체를 제어된 하강·릴리스·이탈 궤적으로 내려놓는다."""
+    target_xy = np.asarray(target_xy, dtype=float)
+    approach_height = max(PLACE_APPROACH_HEIGHT, release_height + 0.06)
+    site_id = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_SITE, EE_SITE)
+
+    def aligned_ee_xy():
+        """EE position that puts the currently held block center on target."""
+        block_xy = env.data.xpos[env.block_body, :2]
+        ee_xy = env.data.site_xpos[site_id, :2]
+        return target_xy - (block_xy - ee_xy)
+
+    # 높은 위치에서 먼저 목표 위로 이동한 뒤 거의 수직으로 하강한다.
+    # 운반 중인 블록이 테이블이나 목표 구역을 가로질러 쓸지 않게 한다.
+    x, y = aligned_ee_xy()
+    _, _, f = move_to(env, [x, y, approach_height], duration=1.2)
     if frames is not None: frames += f
-    info, f = set_gripper(env, GRIPPER_OPEN, duration=0.6)
+    x, y = aligned_ee_xy()
+    _, _, f = move_to(env, [x, y, release_height], duration=0.9)
     if frames is not None: frames += f
-    _, _, f2 = move_to(env, [target_xy[0], target_xy[1], 0.20], duration=0.8)
-    if frames is not None: frames += f2
+
+    # 팔의 추종 오차가 줄어든 뒤 그리퍼를 열고, 블록이 안착한 다음
+    # 그리퍼를 수직으로 이탈시켜 블록을 밀거나 끌지 않게 한다.
+    _, f = hold_position(env, duration=0.2)
+    if frames is not None: frames += f
+
+    # 하강 중 블록이 그리퍼 안에서 움직였으면, 테이블에 닿기 전에 한 번
+    # 더 블록 중심 오차를 보정한다. 이미 놓쳤거나 큰 오차면 쫓아가지 않는다.
+    block_error = target_xy - env.data.xpos[env.block_body, :2]
+    if env._get_info()["block_height"] > 0.07 and np.linalg.norm(block_error) <= 0.05:
+        ee_xy = env.data.site_xpos[site_id, :2]
+        x, y = ee_xy + block_error
+        _, _, f = move_to(env, [x, y, release_height], duration=0.4)
+        if frames is not None: frames += f
+        _, f = hold_position(env, duration=0.1)
+        if frames is not None: frames += f
+
+    _, f = set_gripper(env, GRIPPER_OPEN, duration=0.45)
+    if frames is not None: frames += f
+    _, f = hold_position(env, duration=0.4)
+    if frames is not None: frames += f
+    _, _, f = move_to(env, [x, y, PLACE_RETREAT_HEIGHT], duration=0.8)
+    if frames is not None: frames += f
+    info, f = hold_position(env, duration=0.4)
+    if frames is not None: frames += f
     return info["success"], info
