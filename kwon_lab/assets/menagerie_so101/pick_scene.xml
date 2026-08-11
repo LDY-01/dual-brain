@@ -1,0 +1,52 @@
+<mujoco model="so101_pick">
+    <!-- Menagerie(DeepMind 큐레이션) SO-101 — 그랩 가능한 충돌 프리미티브 내장 -->
+    <include file="so101.xml" />
+
+    <visual>
+        <!-- 광량 합 ~1.05로 억제: 그 이상이면 밝은 회색들이 전부 255로 클리핑돼
+             타일 대비가 사라진다 (과다 노출) -->
+        <headlight diffuse="0.45 0.45 0.45" ambient="0.3 0.3 0.3" specular="0 0 0" />
+        <!-- VLM 친화 씬 (2026-08-10): 반사·체커·어두운 하늘이 시각 모델을 속여
+             (반사상을 실물로 오인, 바닥/하늘 구분 혼란) → 무반사 흰 바닥 + 파란 하늘 -->
+        <rgba haze="0.75 0.85 0.95 1" />
+        <global azimuth="160" elevation="-20" offwidth="1280" offheight="960" />
+    </visual>
+
+    <asset>
+        <texture type="skybox" builtin="gradient" rgb1="0.35 0.55 0.9" rgb2="0.75 0.85 0.95"
+            width="512" height="3072" />
+        <!-- 밝은 저대비 타일 바닥 (10cm): 민무늬는 거리·움직임 단서가 없어 시각 추론이
+             굶는다. 어두운 고대비 체커와 달리 연회색 타일이라 색 기반 인식과 무간섭.
+             실물은 격자 재단 매트로 재현 (2026-08-10 기현님 제안).
+             가는 선(mark=edge)은 원거리 축소로 사라져서 타일 방식 채택 -->
+        <texture type="2d" name="groundplane" builtin="checker"
+            rgb1="0.93 0.93 0.93" rgb2="0.80 0.80 0.80" width="64" height="64" />
+        <material name="groundplane" texture="groundplane" texuniform="true"
+            texrepeat="5 5" reflectance="0" specular="0.1" />
+    </asset>
+
+    <worldbody>
+        <light pos="0 0 3.5" dir="0 0 -1" directional="true" diffuse="0.3 0.3 0.3" />
+        <!-- 골대 추가 후 시야 확보를 위해 +y측으로 재배치 (2026-08-10) -->
+        <camera name="front" pos="0.45 0.45 0.40" xyaxes="-0.914 0.406 0.000 -0.235 -0.529 0.815" />
+        <geom name="floor" size="0 0 0.05" pos="0 0 0" type="plane" material="groundplane" />
+
+        <!-- 잡을 물체: Menagerie scene_box.xml의 검증된 스펙 그대로 (4x4x6cm), 색만 빨강 -->
+        <body name="block" pos="0.25 0.0 0.03">
+            <freejoint name="block_free" />
+            <geom type="box" name="block_geom" size="0.02 0.02 0.03" condim="3"
+                friction="1 .03 .003" rgba="0.9 0.15 0.15 1" contype="2" conaffinity="1"
+                solref="0.01 1" />
+        </body>
+
+        <body name="ball" pos="0.20 -0.12 0.021">
+    <freejoint />
+    <geom type="sphere" size="0.02" mass="0.05" rgba="0.2 0.4 0.9 1" />
+</body>
+
+        <!-- 목표 구역 (시각 표시 전용) -->
+        <site name="target_zone" type="cylinder" pos="0.15 0.18 0.001" size="0.05 0.001"
+            rgba="0.15 0.75 0.3 0.9" />
+
+    </worldbody>
+</mujoco>

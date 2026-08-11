@@ -79,8 +79,23 @@ skill = {
 
 - 학습 loss가 낮아도 관측에 없는 정보는 배울 수 없습니다.
 - 데이터 양보다 태스크에 필요한 정보가 적절한 순간에 보이는지가 더 큰 지렛대입니다.
-- 학생의 성능 상한은 선생 궤적의 품질과 성공률에 크게 제한됩니다.
+- 선생 궤적에 정확한 놓기와 실패 복구가 없으면 학생도 그 행동을 모방하기 어렵습니다. 이는 학생이 선생 성공률을 절대 넘을 수 없다는 수학적 상한이 아니라, 데이터가 제공하는 행동 범위와 품질이 실용적인 성능 한계를 만든다는 뜻입니다.
 - 현재 남은 병목은 파지 순간의 가림, 운반 중 목표 구역의 시야 이탈, 단일 프레임 관측의 움직임 정보 부족입니다.
+
+### DAgger 교정 루프
+
+DAgger(Dataset Aggregation)는 선생의 성공 궤적만 한 번 학습하고 끝내지 않고, **학생이 실제로 방문한 실패 상태에 대한 선생의 교정 행동을 다시 데이터에 추가하는 반복 모방학습 방법**입니다.
+
+```text
+초기 선생 데이터로 학생 학습
+  → 학생 정책을 직접 실행
+  → 학생이 빗나가거나 멈춘 상태 수집
+  → 그 상태에서 선생이 해야 할 행동을 라벨링
+  → 기존 데이터에 교정 데이터 추가
+  → 재학습 및 재평가
+```
+
+일반 행동복제는 선생이 정상적으로 지나간 상태만 보기 때문에, 배포 중 작은 오차로 낯선 상태에 들어가면 복구하지 못하는 분포 이동 문제가 생깁니다. DAgger는 학생 자신의 실패 상태를 다음 학습 데이터로 사용해 이 문제를 줄입니다. 이 프로젝트에서는 ACT가 블록을 밀거나 파지를 놓치거나 목표 구역을 잃은 순간을 System 2가 교정하는 방식으로 적용할 계획입니다.
 
 ## 구현된 제어 흐름
 
@@ -114,7 +129,7 @@ skill = {
 - 미지의 몸 자기 발견 실험
 - Whisper STT와 TTS를 연결한 음성·채팅 콕핏
 
-해당 시뮬레이션 참고 구현은 현재 별도 저장소인 [`kihyeonkwon/lerobot-kwonlab`](https://github.com/kihyeonkwon/lerobot-kwonlab)에 있으며, 이 저장소에는 아직 병합하지 않았습니다. 재현 시에는 upstream LeRobot의 검증 커밋 `a9879e69` 위에 `kwon_lab/`을 얹는 구조를 사용합니다. 데이터셋과 정책 체크포인트는 저장소에 포함하지 않고 로컬에서 재생성합니다.
+시뮬레이션 참고 구현의 핵심 코드와 실행 자산은 이 저장소의 [`kwon_lab/`](./kwon_lab)에 포함되어 있습니다. 원본은 [`kihyeonkwon/lerobot-kwonlab`](https://github.com/kihyeonkwon/lerobot-kwonlab)이며, 검증 당시에는 upstream LeRobot 커밋 `a9879e69` 위에 `kwon_lab/`을 얹어 실행했습니다. 현재 저장소의 LeRobot 0.6.0 환경과의 완전한 호환성은 별도 검증이 필요합니다. 데이터셋·정책 체크포인트·원본 MP4는 저장소에 포함하지 않고 로컬에서 재생성합니다.
 
 ## 그랩 개발에서 얻은 교훈
 
@@ -520,9 +535,11 @@ uv run lerobot-edit-dataset --repo_id=DY-01/rollout_act_lens_cap_v1 --root="<평
 | `Could not write TorqueEnable on id=5` | wrist_roll 모터 통신/토크 설정이 일시 실패 | 12V·USB를 재연결하고 기존 캘리브레이션 파일로 연결 점검 |
 | 서보 기어 파손 | 팔로워 3번 모터의 내부 기어 손상 | STS3215-12V 교체, ID 3 설정 및 재캘리브레이션 완료 |
 
-## Isaac Sim + Isaac Lab 전환 계획
+## Isaac Sim + Isaac Lab 향후 전환 후보
 
-실물 로봇으로 실패 상태를 하나씩 시연하는 대신, NVIDIA Isaac Sim과 Isaac Lab을 사용해 합성 데이터를 대량 생성하고 sim-to-real 전이를 수행합니다. Isaac Sim은 장면·물리·카메라 렌더링을 담당하고, Isaac Lab은 병렬 환경에서 데이터 생성과 정책 학습을 담당합니다.
+**현행 시뮬레이터는 MuJoCo입니다.** Apple Silicon에서 바로 실행할 수 있고, 현재 병목인 그랩·놓기 레시피와 에고센트릭 관측을 검증하는 데 충분하며, 이미 전체 데이터 생성·ACT 평가 파이프라인이 MuJoCo로 작동합니다.
+
+Isaac Sim과 Isaac Lab은 당장의 다음 단계가 아니라 향후 전환 후보입니다. NVIDIA RTX 워크스테이션을 사용할 수 있고, 대규모 병렬 강화학습이나 고품질 시각 도메인 랜덤화가 실제 병목으로 확인될 때 전환을 검토합니다. 전환할 경우 Isaac Sim은 장면·물리·카메라 렌더링을, Isaac Lab은 병렬 환경의 데이터 생성과 정책 학습을 담당합니다.
 
 현재 `simulation_assets/so101`에는 SO101의 MuJoCo(MJCF) 및 URDF 자산이 있습니다. Isaac 환경에는 이 로봇 자산을 USD/URDF 기반으로 가져오고, 상자·렌즈 뚜껑·책상·고정 RGB 카메라를 추가로 구성해야 합니다. 현재 자산은 그리퍼의 LeRobot 표현(`0=닫힘`, `100=열림`)과 동일한 제어 매핑이 아직 반영되지 않았으므로, 집기 학습 전에 이를 검증합니다.
 
@@ -543,7 +560,7 @@ uv run lerobot-edit-dataset --repo_id=DY-01/rollout_act_lens_cap_v1 --root="<평
 
 ### 실행 환경
 
-Isaac Sim과 Isaac Lab 본체는 NVIDIA RTX GPU가 있는 Windows 또는 Linux 워크스테이션/서버에서 실행합니다. 현재 macOS 장비는 실제 SO101 연결·평가와 원격 시뮬레이터 화면 확인 용도로 사용합니다. 공식 요구사항은 RTX 4080급 16GB VRAM, RAM 32GB, SSD 여유 공간 50GB 이상을 최소 기준으로 제시합니다.
+현행 MuJoCo 개발과 ACT 학습은 Apple Silicon macOS 환경을 기준으로 합니다. 향후 Isaac Sim과 Isaac Lab으로 전환한다면 NVIDIA RTX GPU가 있는 Windows 또는 Linux 워크스테이션·서버가 필요합니다. 이 경우 macOS 장비는 실제 SO-101 연결·평가와 원격 시뮬레이터 확인에 사용합니다.
 
 - [NVIDIA SO-101 sim-to-real 도메인 랜덤화 가이드](https://docs.nvidia.com/learning/physical-ai/sim-to-real-so-101/latest/09-strategy1-dr-teleop.html)
 - [Isaac Lab 시각 도메인 랜덤화 가이드](https://docs.nvidia.com/learning/physical-ai/getting-started-with-isaac-lab/latest/transferring-robot-learning-policies-from-simulation-to-reality/03-bridging-the-gap-simulation-enhancement/01-visual-domain-randomization.html)
@@ -551,11 +568,12 @@ Isaac Sim과 Isaac Lab 본체는 NVIDIA RTX GPU가 있는 Windows 또는 Linux �
 
 ## 다음 단계
 
-1. 사용할 Windows/Linux NVIDIA RTX GPU 워크스테이션 또는 클라우드 환경을 확보합니다.
-2. SO101, 상자, 렌즈 뚜껑, 책상, 카메라를 포함한 Isaac Sim 장면을 구성하고 실제 치수·카메라 구도를 맞춥니다.
-3. 그리퍼 제어와 물리 접촉을 검증한 뒤, 성공 및 복구 궤적을 자동 생성합니다.
-4. 도메인 랜덤화 합성 데이터로 정책을 학습하고, 실제 데이터로 소량 보정합니다.
-5. 홈 자세 고정 조건에서 실제 로봇 정식 10회 평가를 수행하고 v1·v2·시뮬레이션 보정 모델을 비교합니다.
+1. MuJoCo 선생의 놓기 높이와 궤적을 개선해 성공률을 높입니다.
+2. 운반 중 목표 구역 재조준과 `n_obs_steps=2`를 각각 단일 변인으로 실험합니다.
+3. ACT 실패 상태를 System 2가 교정하는 DAgger 루프를 한 번 수행합니다.
+4. 동일한 미학습 시드로 재평가하여 선생 개선·가시성·시간 관측의 효과를 비교합니다.
+5. MuJoCo 결과가 안정되면 실물 SO-101에서 sim-to-real 격차를 측정하고 소량의 실물 데이터로 보정합니다.
+6. 대규모 병렬 학습이나 시각 도메인 랜덤화가 실제 병목이 될 때 Isaac Sim·Isaac Lab 전환을 재검토합니다.
 
 ## GitHub에 포함하지 않는 항목
 
