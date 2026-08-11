@@ -1,0 +1,7 @@
+# 업스트림 lerobot .gitignore가 *.xml 등을 전역 차단하므로, kwon_lab 안에서는 되살린다.
+# (씬 XML과 로봇 메시는 이 프로젝트의 핵심 자산)
+!*.xml
+!*.stl
+!*.urdf
+!*.png
+__pycache__/
