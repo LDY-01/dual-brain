@@ -1,0 +1,12 @@
+{
+  "format_version": 1,
+  "roles": {
+    "wrist": null,
+    "overhead": null
+  },
+  "startup_policy": {
+    "require_distinct_indices": true,
+    "require_view_confirmation_after_usb_change": true,
+    "block_robot_motion_when_incomplete": true
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "coordinate_frame": "robot_base_table_m",
+  "origin_instruction": "Use the shoulder-pan rotation axis projected onto the table as XY=(0,0). Measure X forward and Y left from the robot's view.",
+  "points": [
+    {"name": "near_right", "table_xy_m": [0.18, -0.10]},
+    {"name": "near_left", "table_xy_m": [0.18, 0.10]},
+    {"name": "center", "table_xy_m": [0.23, 0.00]},
+    {"name": "far_right", "table_xy_m": [0.28, -0.10]},
+    {"name": "far_left", "table_xy_m": [0.28, 0.10]},
+    {"name": "far_center", "table_xy_m": [0.28, 0.00]}
+  ]
+}

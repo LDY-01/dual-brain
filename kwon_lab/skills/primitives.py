@@ -79,7 +79,15 @@ def solve_ik(model, target_pos, q_init, point_down=False, pitch_deg=60, n_iter=3
     return q, float(pos_err)
 
 
-def move_to(env, xyz, gripper=None, duration=1.2, point_down=False, pitch_deg=60):
+def move_to(
+    env,
+    xyz,
+    gripper=None,
+    duration=1.2,
+    point_down=False,
+    pitch_deg=60,
+    on_observation=None,
+):
     """그리퍼 끝을 (x,y,z)로 보낸다. gripper: None=유지 / 값=목표 관절각.
 
     point_down=True면 손가락을 pitch_deg만큼 아래로 기울인 채 이동 (그랩 자세).
@@ -97,10 +105,37 @@ def move_to(env, xyz, gripper=None, duration=1.2, point_down=False, pitch_deg=60
         action = np.concatenate([q_now + a * (q_target - q_now), [g_now + a * (g_target - g_now)]])
         obs, _, _, _, info = env.step(action)
         frames.append(obs["pixels"])
+        if on_observation is not None:
+            on_observation(obs)
     return info, ik_err, frames
 
 
-def set_gripper(env, value, duration=0.6):
+def move_joints(env, q_target, gripper=None, duration=1.0):
+    """Interpolate to a precomputed five-joint arm target."""
+    q_now = env.data.qpos[:5].copy()
+    q_target = np.asarray(q_target, dtype=float)
+    g_now = float(env.data.ctrl[5])
+    g_target = g_now if gripper is None else float(gripper)
+    frames, info = [], env._get_info()
+    n_steps = max(1, int(duration * env.metadata["render_fps"]))
+    for i in range(n_steps):
+        a = (i + 1) / n_steps
+        action = np.concatenate(
+            [q_now + a * (q_target - q_now), [g_now + a * (g_target - g_now)]]
+        )
+        obs, _, _, _, info = env.step(action)
+        frames.append(obs["pixels"])
+    return info, frames
+
+
+def retreat_vertical(env, height=0.20, duration=0.8):
+    """Raise the end effector at its current XY using robot state only."""
+    site_id = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_SITE, EE_SITE)
+    xy = env.data.site_xpos[site_id, :2].copy()
+    return move_to(env, [xy[0], xy[1], height], duration=duration)
+
+
+def set_gripper(env, value, duration=0.6, on_observation=None):
     """그리퍼만 여닫는다 (팔은 현재 목표 유지)."""
     frames, info = [], None
     arm = env.data.ctrl[:5].copy()
@@ -110,10 +145,12 @@ def set_gripper(env, value, duration=0.6):
         a = (i + 1) / n_steps
         obs, _, _, _, info = env.step(np.concatenate([arm, [g_now + a * (value - g_now)]]))
         frames.append(obs["pixels"])
+        if on_observation is not None:
+            on_observation(obs)
     return info, frames
 
 
-def hold_position(env, duration=0.2):
+def hold_position(env, duration=0.2, on_observation=None):
     """Hold the current command so the arm or released object can settle."""
     frames, info = [], env._get_info()
     n_steps = max(1, int(duration * env.metadata["render_fps"]))
@@ -121,6 +158,8 @@ def hold_position(env, duration=0.2):
     for _ in range(n_steps):
         obs, _, _, _, info = env.step(action)
         frames.append(obs["pixels"])
+        if on_observation is not None:
+            on_observation(obs)
     return info, frames
 
 
@@ -130,7 +169,7 @@ POCKET_OFFSET = np.array([-0.03, 0.0, 0.01])  # 실측: 포켓 중심의 site계
 GRASP_PITCH = 50  # 50시드 탐색에서 가장 안정적이었던 접근 각도 (deg)
 
 
-def pick(env, block_pos, frames=None):
+def pick(env, block_pos, frames=None, on_lift_observation=None):
     """블록 위치를 받아 집어 올린다. 성공 여부 반환.
 
     검증된 레시피(2026-08-10): 45도 접근 → 손가락 축 따라 삽입(클로머신) →
@@ -156,9 +195,16 @@ def pick(env, block_pos, frames=None):
     _, f = hold_position(env, duration=0.25)
     if frames is not None: frames += f
     lift_xy = env.data.site_xpos[sid, :2].copy()
-    info, _, f = move_to(env, [lift_xy[0], lift_xy[1], 0.18], duration=1.3)
+    info, _, f = move_to(
+        env,
+        [lift_xy[0], lift_xy[1], 0.18],
+        duration=1.3,
+        on_observation=on_lift_observation,
+    )
     if frames is not None: frames += f
-    info, f = hold_position(env, duration=0.3)
+    info, f = hold_position(
+        env, duration=0.3, on_observation=on_lift_observation
+    )
     if frames is not None: frames += f
     return info["block_height"] > 0.08, info
 

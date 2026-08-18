@@ -1,0 +1,24 @@
+{
+  "format_version": 1,
+  "units": "degrees",
+  "recorded_at": null,
+  "layout_policy": {
+    "camera_pillar_side": "right",
+    "task_workspace": "opposite_side_of_camera_pillar",
+    "measured_physical_clearance_cm": null
+  },
+  "joints": {
+    "shoulder_pan": {
+      "min_deg": null,
+      "max_deg": null,
+      "blocked_physical_direction": "right_toward_camera_pillar",
+      "blocked_encoder_direction": null,
+      "measured_clear_boundary_deg": null,
+      "safety_margin_deg": 10.0
+    }
+  },
+  "enforcement": {
+    "fail_if_unconfigured": true,
+    "max_relative_target_deg": 5.0
+  }
+}

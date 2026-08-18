@@ -16,19 +16,28 @@ MISSED_PICK_CONFIRM_FRAMES = 8
 GRIPPER_OPEN_THRESHOLD = 1.25
 GRIPPER_EMPTY_CLOSED_THRESHOLD = 0.12
 GRIPPER_HOLDING_MIN = 0.18
-GRIPPER_HOLDING_MAX = 0.65
+GRIPPER_HOLDING_MAX = 0.80
 GRASP_CONFIRM_FRAMES = 12
-GRIPPER_STABLE_RANGE = 0.06
+GRIPPER_STABLE_RANGE = 0.07
 MIN_ARM_MOTION_FOR_GRASP = 0.08
 MAX_HELD_CENTROID_SPREAD_PX = 70.0
 MAX_HELD_AREA_RATIO = 2.5
 DROP_CONFIRM_FRAMES = 15
-PLACE_CONFIRM_FRAMES = 8
+PLACE_CONFIRM_FRAMES = 10
 OVERHEAD_TABLE_AREA_MIN_RATIO = 0.65
-OVERHEAD_TABLE_AREA_MAX_RATIO = 1.25
+OVERHEAD_TABLE_AREA_MAX_RATIO = 1.45
 BLOCK_TO_TARGET_AREA_RATIO = (0.04 * 0.04) / (np.pi * 0.05 * 0.05)
 OVERHEAD_DROP_MAX_CENTROID_SPREAD_PX = 12.0
 OVERHEAD_DROP_MIN_ARM_MOTION = 0.08
+DUAL_TRACK_WINDOW = 20
+DUAL_MIN_OVERHEAD_VISIBLE = 12
+DUAL_OVERHEAD_MAX_SPREAD_PX = 75.0
+DUAL_MIN_ARM_MOTION = 0.08
+DUAL_WRIST_MAX_OFFSET_PX = 85.0
+DUAL_WRIST_MIN_AREA_RATIO = 0.35
+DUAL_WRIST_MAX_AREA_RATIO = 3.0
+DUAL_DETACH_CONFIRM_FRAMES = 5
+DUAL_DROP_CONFIRM_FRAMES = 5
 
 
 @dataclass(frozen=True)
@@ -70,7 +79,9 @@ def color_masks(frame: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     if rgb.ndim != 3 or rgb.shape[2] != 3:
         raise ValueError(f"Expected HxWx3 RGB frame, got {rgb.shape}")
     r, g, b = (rgb[:, :, i].astype(np.int16) for i in range(3))
-    red = (r > 100) & (r > 4 * g) & (r > 4 * b)
+    # Keep chromatic dominance strict enough to reject the yellow robot, while
+    # allowing the red block to remain visible in the arm/light shadow.
+    red = (r > 70) & (r > 2.5 * g) & (r > 2.5 * b)
     green = (g > 100) & (g > 2 * r) & (g > 2 * b)
     return red, green
 
@@ -119,6 +130,7 @@ class OverheadTaskMonitor:
 
         place_like = (
             grasp_confirmed
+            and table_like
             and self.last_coverage >= 0.75
             and gripper >= GRIPPER_OPEN_THRESHOLD
         )
@@ -152,8 +164,181 @@ class OverheadTaskMonitor:
         return observation, {
             "possible_drop": self.possible_drop,
             "possible_place": self.possible_place,
+            "place_evidence_frames": self.place_evidence,
             "image_target_coverage": self.last_coverage,
             "table_area_ratio": self.last_table_area_ratio,
+        }
+
+
+class DualCameraTaskMonitor:
+    """Fuse wrist attachment and fixed-overhead stationarity evidence.
+
+    A transport drop is emitted only after the block was visibly attached to
+    the gripper, then detached in the wrist view, while the overhead view sees
+    it remain stationary as the arm keeps moving. Inputs are RGB images and
+    joint state only; simulator object poses are forbidden.
+    """
+
+    def __init__(self, overhead_calibration_frame: np.ndarray):
+        self.pick = VisionPickMonitor()
+        self.overhead = OverheadTaskMonitor(overhead_calibration_frame)
+        self.overhead_history = deque(maxlen=DUAL_TRACK_WINDOW)
+        self.reference_wrist_centroid = None
+        self.reference_wrist_area = None
+        self.was_wrist_attached = False
+        self.detach_evidence = 0
+        self.drop_evidence = 0
+        self.transport_drop = False
+        self.failed_release_evidence = 0
+        self.failed_release = False
+
+    def _capture_wrist_reference(self):
+        visible = [
+            (centroid, pixels)
+            for _, seen, centroid, pixels, _ in self.pick.holding_history
+            if seen and centroid is not None
+        ]
+        if len(visible) != GRASP_CONFIRM_FRAMES:
+            return
+        self.reference_wrist_centroid = np.median(
+            np.asarray([item[0] for item in visible], dtype=float), axis=0
+        )
+        self.reference_wrist_area = float(
+            np.median([item[1] for item in visible])
+        )
+        self.was_wrist_attached = True
+
+    def prime_attached(self, wrist_frame: np.ndarray) -> bool:
+        """Start transport monitoring from an already verified grasp.
+
+        PICK and TRANSPORT are separate state-machine states.  PICK performs
+        the stronger multi-frame grasp check; this handoff records only the
+        final wrist appearance so TRANSPORT can detect a later detachment.
+        """
+        red = observe_colors(wrist_frame).red_block
+        if not red.visible or red.centroid is None:
+            return False
+        self.reference_wrist_centroid = np.asarray(red.centroid, dtype=float)
+        self.reference_wrist_area = float(red.pixels)
+        self.pick.grasp_confirmed = True
+        self.was_wrist_attached = True
+        return True
+
+    def update(self, wrist_frame, overhead_frame, joint_state, step: int):
+        wrist_observation, pick_event = self.pick.update(
+            wrist_frame, joint_state, step
+        )
+        gripper = float(np.asarray(joint_state)[-1])
+        arm = np.asarray(joint_state, dtype=float)[:5].copy()
+        if self.pick.grasp_confirmed and not self.was_wrist_attached:
+            self._capture_wrist_reference()
+
+        overhead_observation, overhead_signals = self.overhead.update(
+            overhead_frame, joint_state, self.pick.grasp_confirmed
+        )
+        self.overhead_history.append((overhead_observation.red_block.centroid, arm))
+
+        overhead_stationary = False
+        overhead_table_stationary = False
+        overhead_spread = 0.0
+        arm_motion = 0.0
+        visible_overhead = [
+            centroid for centroid, _ in self.overhead_history
+            if centroid is not None
+        ]
+        if (
+            len(self.overhead_history) == DUAL_TRACK_WINDOW
+            and len(visible_overhead) >= DUAL_MIN_OVERHEAD_VISIBLE
+        ):
+            centroids = np.asarray(visible_overhead, dtype=float)
+            center = np.median(centroids, axis=0)
+            distances = np.linalg.norm(centroids - center, axis=1)
+            overhead_spread = float(np.quantile(distances, 0.8))
+            arm_motion = float(
+                np.linalg.norm(
+                    self.overhead_history[-1][1] - self.overhead_history[0][1]
+                )
+            )
+            overhead_stationary = (
+                overhead_spread <= DUAL_OVERHEAD_MAX_SPREAD_PX
+                and arm_motion >= DUAL_MIN_ARM_MOTION
+            )
+            overhead_table_stationary = (
+                overhead_spread <= DUAL_OVERHEAD_MAX_SPREAD_PX
+            )
+
+        wrist_offset = 0.0
+        wrist_area_ratio = 0.0
+        wrist_detached_now = False
+        if self.was_wrist_attached:
+            red = wrist_observation.red_block
+            if red.visible:
+                wrist_offset = float(
+                    np.linalg.norm(
+                        np.asarray(red.centroid) - self.reference_wrist_centroid
+                    )
+                )
+                wrist_area_ratio = red.pixels / max(1.0, self.reference_wrist_area)
+                wrist_detached_now = (
+                    wrist_offset > DUAL_WRIST_MAX_OFFSET_PX
+                    or wrist_area_ratio < DUAL_WRIST_MIN_AREA_RATIO
+                    or wrist_area_ratio > DUAL_WRIST_MAX_AREA_RATIO
+                )
+            else:
+                wrist_detached_now = True
+        self.detach_evidence = (
+            self.detach_evidence + 1 if wrist_detached_now else 0
+        )
+        wrist_detached = self.detach_evidence >= DUAL_DETACH_CONFIRM_FRAMES
+
+        drop_like = (
+            self.was_wrist_attached
+            and wrist_detached
+            and overhead_stationary
+            and overhead_signals["image_target_coverage"] < 0.75
+            and gripper <= GRIPPER_HOLDING_MAX
+        )
+        self.drop_evidence = self.drop_evidence + 1 if drop_like else 0
+        if self.drop_evidence >= DUAL_DROP_CONFIRM_FRAMES:
+            self.transport_drop = True
+
+        failed_release_like = (
+            self.was_wrist_attached
+            and wrist_detached
+            and overhead_table_stationary
+            and overhead_signals["image_target_coverage"] < 0.75
+            and gripper >= GRIPPER_OPEN_THRESHOLD
+        )
+        self.failed_release_evidence = (
+            self.failed_release_evidence + 1 if failed_release_like else 0
+        )
+        if self.failed_release_evidence >= DUAL_DROP_CONFIRM_FRAMES:
+            self.failed_release = True
+
+        recovery_reason = (
+            "transport_drop" if self.transport_drop
+            else "failed_release" if self.failed_release
+            else None
+        )
+
+        return {
+            "pick_event": pick_event,
+            "grasp_confirmed": self.pick.grasp_confirmed,
+            "dual_grasp_confirmed": self.was_wrist_attached,
+            "wrist_attached_once": self.was_wrist_attached,
+            "wrist_detached": wrist_detached,
+            "wrist_offset_px": wrist_offset,
+            "wrist_area_ratio": wrist_area_ratio,
+            "overhead_stationary": overhead_stationary,
+            "overhead_table_stationary": overhead_table_stationary,
+            "overhead_spread_px": overhead_spread,
+            "arm_motion": arm_motion,
+            "transport_drop": self.transport_drop,
+            "failed_release": self.failed_release,
+            "recovery_reason": recovery_reason,
+            "drop_evidence_frames": self.drop_evidence,
+            "failed_release_evidence_frames": self.failed_release_evidence,
+            **overhead_signals,
         }
 
 
@@ -215,6 +400,13 @@ class VisionPickMonitor:
         self.grasp_confirmed = False
         self.last_event = None
         self.holding_history = deque(maxlen=GRASP_CONFIRM_FRAMES)
+        self.last_holding_metrics = {
+            "visible_history": False,
+            "gripper_range": 0.0,
+            "centroid_spread_px": 0.0,
+            "area_ratio": 0.0,
+            "arm_motion": 0.0,
+        }
 
     def reset(self):
         self.__init__()
@@ -248,10 +440,21 @@ class VisionPickMonitor:
             arm_motion = float(np.linalg.norm(arm_end - arm_start))
         else:
             centroid_spread = area_ratio = arm_motion = 0.0
+        gripper_range = (
+            float(max(holding_values) - min(holding_values))
+            if holding_values else 0.0
+        )
+        self.last_holding_metrics = {
+            "visible_history": bool(visible_history),
+            "gripper_range": gripper_range,
+            "centroid_spread_px": centroid_spread,
+            "area_ratio": area_ratio,
+            "arm_motion": arm_motion,
+        }
         stable_holding = (
             visible_history
             and all(GRIPPER_HOLDING_MIN <= value <= GRIPPER_HOLDING_MAX for value in holding_values)
-            and max(holding_values) - min(holding_values) <= GRIPPER_STABLE_RANGE
+            and gripper_range <= GRIPPER_STABLE_RANGE
             and arm_motion >= MIN_ARM_MOTION_FOR_GRASP
             and centroid_spread <= MAX_HELD_CENTROID_SPREAD_PX
             and area_ratio <= MAX_HELD_AREA_RATIO

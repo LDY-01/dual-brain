@@ -97,10 +97,7 @@ class SO101PickEnv(gym.Env):
         grid_n = 61
         axis = (np.arange(grid_n, dtype=float) + 0.5) / grid_n * 2.0 - 1.0
         gx, gy = np.meshgrid(axis, axis, indexing="xy")
-        half_xy = self.model.geom_size[self.block_geom, :2]
-        self._block_footprint = np.column_stack(
-            [gx.ravel() * half_xy[0], gy.ravel() * half_xy[1]]
-        )
+        self._footprint_grid = np.column_stack([gx.ravel(), gy.ravel()])
         self._target_radius = float(self.model.site_size[self.target_site, 0])
 
         ctrl = self.model.actuator_ctrlrange  # (6, 2)
@@ -209,8 +206,23 @@ class SO101PickEnv(gym.Env):
         """특권 상태 — System 2 피드백과 성공 판정에 사용 (시뮬 전용)."""
         block = self.data.xpos[self.block_body]
         target = self.data.site_xpos[self.target_site]
-        rotation_xy = self.data.xmat[self.block_body].reshape(3, 3)[:2, :2]
-        footprint_world = block[:2] + self._block_footprint @ rotation_xy.T
+        rotation = self.data.xmat[self.block_body].reshape(3, 3)
+        # Use the face whose normal is most vertical.  This preserves the
+        # original 4x4 cm footprint while upright and correctly switches to a
+        # 4x6 cm contact face after the block tips onto its side.
+        normal_axis = int(np.argmax(np.abs(rotation[2, :])))
+        tangent_axes = [axis for axis in range(3) if axis != normal_axis]
+        half_size = self.model.geom_size[self.block_geom]
+        tangent_vectors = np.column_stack(
+            [
+                rotation[:2, axis] * half_size[axis]
+                for axis in tangent_axes
+            ]
+        )
+        footprint_world = (
+            block[:2]
+            + self._footprint_grid @ tangent_vectors.T
+        )
         coverage = float(np.mean(
             np.linalg.norm(footprint_world - target[:2], axis=1) <= self._target_radius
         ))

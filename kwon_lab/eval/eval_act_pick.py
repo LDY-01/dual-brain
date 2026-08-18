@@ -25,7 +25,7 @@ import torch
 
 from envs.so101_pick_env import SO101PickEnv
 from skills.supervision import FALLBACK_NO_LIFT_STEP, LIFTED_HEIGHT, repick_reason
-from skills.vision_supervision import VisionPickMonitor
+from skills.vision_supervision import DualCameraTaskMonitor, VisionPickMonitor
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 # --version 인자로 v1(front·구관측)/v2(wrist·에고센트릭) 선택
@@ -124,14 +124,11 @@ def teacher_complete_task(env, frames):
 
 
 def vision_reaim(env, frames):
-    """Open the gripper and reacquire the block using only wrist RGB + joints."""
-    from skills.aiming import aim_at
-    from skills.primitives import GRIPPER_OPEN, set_gripper
+    """Reacquire with overhead coarse localization and wrist fine aiming."""
+    from skills.block_reacquisition import reacquire_block
 
-    _, retry_frames = set_gripper(env, GRIPPER_OPEN, duration=0.35)
-    frames.extend(retry_frames)
-    found, centered = aim_at(env, "red_block", frames=frames, attempts=3)
-    return bool(found and centered)
+    report = reacquire_block(env, frames=frames)
+    return bool(report["ready_for_pick"])
 
 
 def rollout(
@@ -143,6 +140,7 @@ def rollout(
     aim=False,
     retry_pick=False,
     vision_retry_pick=False,
+    dual_camera_recovery=False,
     max_pick_retries=3,
     pick_verify_steps=DEFAULT_PICK_VERIFY_STEPS,
     full_recovery=False,
@@ -155,9 +153,13 @@ def rollout(
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
     obs, info = env.reset(seed=seed)
+    overhead_calibration = env.render_overhead() if dual_camera_recovery else None
     if aim:  # 배포 파이프라인과 동일: 로컬 지각이 조준 → 정책 인계
-        from skills.aiming import aim_at
-        aim_at(env, "red_block")
+        if dual_camera_recovery:
+            vision_reaim(env, [])
+        else:
+            from skills.aiming import aim_at
+            aim_at(env, "red_block")
         obs = env._get_obs()
     policy.reset()  # ACT 액션 청크 큐 초기화 (에피소드 간 누수 방지)
     frames = [obs["pixels"]]
@@ -168,11 +170,23 @@ def rollout(
     retry_exhausted = False
     last_retry_reason = None
     vision_monitor = VisionPickMonitor() if vision_retry_pick else None
+    dual_monitor = (
+        DualCameraTaskMonitor(overhead_calibration)
+        if dual_camera_recovery else None
+    )
     attempt_start_step = 0
     low_after_lift_steps = 0
     task_recoveries = 0
     task_recovery_reasons = []
-    for t in range(MAX_STEPS):
+    vision_source = (
+        "wrist_rgb_overhead_rgb_and_joints"
+        if dual_camera_recovery else "wrist_rgb_and_joints"
+    )
+    rollout_limit = (
+        MAX_STEPS * (1 + max_task_recoveries)
+        if dual_camera_recovery else MAX_STEPS
+    )
+    for t in range(rollout_limit):
         batch = pre(obs_to_batch(obs))
         with torch.inference_mode():
             action = policy.select_action(batch)
@@ -180,7 +194,15 @@ def rollout(
         action = np.asarray(action.squeeze(0).cpu(), dtype=np.float64)
         obs, _, _, _, info = env.step(action)
         frames.append(obs["pixels"])
-        if vision_retry_pick:
+        dual_signals = None
+        if dual_camera_recovery:
+            dual_signals = dual_monitor.update(
+                obs["pixels"], env.render_overhead(), obs["agent_pos"],
+                t + 1 - attempt_start_step,
+            )
+            vision_event = dual_signals["pick_event"]
+            lifted_once = dual_signals["dual_grasp_confirmed"]
+        elif vision_retry_pick:
             _, vision_event = vision_monitor.update(
                 obs["pixels"], obs["agent_pos"], t + 1 - attempt_start_step
             )
@@ -197,10 +219,10 @@ def rollout(
         # Do not let a missed pick continue into transport. Discard ACT's
         # queued actions, retry the pick, and resume only after lift is verified.
         retry_reason = (
-            vision_event if vision_retry_pick
+            vision_event if (vision_retry_pick or dual_camera_recovery)
             else repick_reason(info, t + 1, lifted_once, pick_verify_steps)
         )
-        if vision_retry_pick and retry_reason is not None:
+        if (vision_retry_pick or dual_camera_recovery) and retry_reason is not None:
             last_retry_reason = retry_reason
             if retries >= max_pick_retries:
                 retry_exhausted = True
@@ -210,7 +232,7 @@ def rollout(
                     "pick_retry_exhausted": True,
                     "lift_verified": False,
                     "pick_retry_reason": retry_reason,
-                    "supervision_source": "wrist_rgb_and_joints",
+                    "supervision_source": vision_source,
                 }
             retries += 1
             policy.reset()
@@ -223,12 +245,46 @@ def rollout(
                         "pick_retry_exhausted": True,
                         "lift_verified": False,
                         "pick_retry_reason": "vision_reaim_failed",
-                        "supervision_source": "wrist_rgb_and_joints",
+                        "supervision_source": vision_source,
                     }
             obs = env._get_obs()
             info = env._get_info()
-            vision_monitor.reset()
+            if dual_camera_recovery:
+                dual_monitor = DualCameraTaskMonitor(env.render_overhead())
+            else:
+                vision_monitor.reset()
             attempt_start_step = t + 1
+            continue
+
+        # Only the validated high-precision transport-drop signal is active.
+        # The monitor's failed-release signal remains shadow-only because its
+        # current false-positive rate is not safe for control.
+        if (
+            dual_camera_recovery
+            and dual_signals["transport_drop"]
+            and task_recoveries < max_task_recoveries
+        ):
+            task_recoveries += 1
+            task_recovery_reasons.append("vision_transport_drop")
+            policy.reset()
+            reaimed = vision_reaim(env, frames)
+            obs = env._get_obs()
+            info = env._get_info()
+            if not reaimed and task_recoveries >= max_task_recoveries:
+                return False, t + 1, info, frames, {
+                    "pick_retries": retries,
+                    "teacher_repick_successes": 0,
+                    "pick_retry_exhausted": False,
+                    "lift_verified": False,
+                    "pick_retry_reason": "vision_reaim_failed_after_drop",
+                    "task_recoveries": task_recoveries,
+                    "task_recovery_reasons": task_recovery_reasons,
+                    "supervision_source": vision_source,
+                }
+            dual_monitor = DualCameraTaskMonitor(env.render_overhead())
+            attempt_start_step = t + 1
+            lifted_once = False
+            low_after_lift_steps = 0
             continue
         if retry_pick and retry_reason is not None:
             last_retry_reason = retry_reason
@@ -314,7 +370,7 @@ def rollout(
                 "task_recoveries": task_recoveries,
                 "task_recovery_reasons": task_recovery_reasons,
                 "supervision_source": (
-                    "wrist_rgb_and_joints" if vision_retry_pick
+                    vision_source if (vision_retry_pick or dual_camera_recovery)
                     else "mujoco_privileged_state" if retry_pick else "none"
                 ),
             }
@@ -334,7 +390,7 @@ def rollout(
                 "task_recovery_reasons": task_recovery_reasons,
                 "supervision_source": "mujoco_privileged_state",
             }
-    return False, MAX_STEPS, info, frames, {
+    return False, rollout_limit, info, frames, {
         "pick_retries": retries,
         "teacher_repick_successes": retry_successes,
         "pick_retry_exhausted": retry_exhausted,
@@ -343,7 +399,7 @@ def rollout(
         "task_recoveries": task_recoveries,
         "task_recovery_reasons": task_recovery_reasons,
         "supervision_source": (
-            "wrist_rgb_and_joints" if vision_retry_pick
+            vision_source if (vision_retry_pick or dual_camera_recovery)
             else "mujoco_privileged_state" if retry_pick else "none"
         ),
     }
@@ -391,6 +447,10 @@ def main():
         "--vision-retry-pick", action="store_true",
         help="MuJoCo 물체 좌표 없이 손목 RGB와 관절값으로 실패 판정·재시도",
     )
+    ap.add_argument(
+        "--dual-camera-recovery", action="store_true",
+        help="손목+상단 RGB로 집기 실패/운반 낙하를 감지해 재조준·재집기",
+    )
     ap.add_argument("--max-pick-retries", type=int, default=3)
     ap.add_argument("--pick-verify-steps", type=int, default=DEFAULT_PICK_VERIFY_STEPS)
     ap.add_argument(
@@ -399,8 +459,13 @@ def main():
     )
     ap.add_argument("--max-task-recoveries", type=int, default=2)
     args = ap.parse_args()
-    if args.retry_pick and args.vision_retry_pick:
-        ap.error("Choose only one of --retry-pick and --vision-retry-pick")
+    recovery_modes = sum(
+        (args.retry_pick, args.vision_retry_pick, args.dual_camera_recovery)
+    )
+    if recovery_modes > 1:
+        ap.error("Choose only one recovery mode")
+    if args.dual_camera_recovery and args.full_recovery:
+        ap.error("--dual-camera-recovery cannot be combined with --full-recovery")
 
     ckpt_rel, out_rel, image_key, camera = VERSIONS[args.version]
     global IMAGE_KEY
@@ -443,6 +508,7 @@ def main():
             aim=args.version in AIM_START,
             retry_pick=args.retry_pick,
             vision_retry_pick=args.vision_retry_pick,
+            dual_camera_recovery=args.dual_camera_recovery,
             max_pick_retries=args.max_pick_retries,
             pick_verify_steps=args.pick_verify_steps,
             full_recovery=args.full_recovery,
@@ -462,14 +528,14 @@ def main():
             tag = "ok" if success else "fail"
             if save_video(frames, out_dir / f"{tag}_seed{5000 + i}.mp4"):
                 saved_by_outcome[bool(success)] += 1
-        mark = "✅" if success else "❌"
+        mark = "OK" if success else "FAIL"
         print(f"  ep {i + 1:2d}/{args.episodes} {mark}  {steps:3d}스텝 "
               f"({steps / 25:.1f}s)  최종거리 {info['dist_to_target'] * 1000:.0f}mm")
 
     n_ok = sum(r["success"] for r in results)
     ok_steps = [r["steps"] for r in results if r["success"]]
     print(f"\n{'=' * 52}")
-    print(f"ACT ({args.step}스텝 학습) — 성공률 {n_ok}/{args.episodes} "
+    print(f"ACT ({args.step}스텝 학습) - 성공률 {n_ok}/{args.episodes} "
           f"({n_ok / args.episodes * 100:.0f}%)")
     if ok_steps:
         print(f"성공 에피소드 평균 {np.mean(ok_steps) / 25:.1f}초 "
@@ -484,6 +550,7 @@ def main():
         "reobservation_seconds": action_steps / 25,
         "retry_pick": bool(args.retry_pick),
         "vision_retry_pick": bool(args.vision_retry_pick),
+        "dual_camera_recovery": bool(args.dual_camera_recovery),
         "max_pick_retries": int(args.max_pick_retries),
         "pick_verify_steps": int(args.pick_verify_steps),
         "full_recovery": bool(args.full_recovery),
