@@ -10,8 +10,9 @@ results/
 
 # Local datasets and recordings
 lerobot_data/
-videos/
+/videos/
 *.mp4
+!artifacts/**/*.mp4
 *.rrd
 
 # Secrets
