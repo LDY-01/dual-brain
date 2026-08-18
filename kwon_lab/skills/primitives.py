@@ -127,7 +127,7 @@ def hold_position(env, duration=0.2):
 # ── 상위 스킬: 오늘 검증된 그랩 레시피를 함수로 봉인 ──────────
 
 POCKET_OFFSET = np.array([-0.03, 0.0, 0.01])  # 실측: 포켓 중심의 site계 오프셋
-GRASP_PITCH = 45  # 접근 각도 (deg)
+GRASP_PITCH = 50  # 50시드 탐색에서 가장 안정적이었던 접근 각도 (deg)
 
 
 def pick(env, block_pos, frames=None):
@@ -150,7 +150,15 @@ def pick(env, block_pos, frames=None):
     if frames is not None: frames += f
     _, f = set_gripper(env, -0.1, duration=0.7)
     if frames is not None: frames += f
-    info, _, f = move_to(env, [b[0], b[1], 0.18], duration=1.2)
+
+    # 닫힘 직후 접촉력이 안정될 시간을 주고, 현재 EE의 수평 위치를
+    # 유지한 채 수직으로 들어 올려 약한 그립에 횡력이 걸리지 않게 한다.
+    _, f = hold_position(env, duration=0.25)
+    if frames is not None: frames += f
+    lift_xy = env.data.site_xpos[sid, :2].copy()
+    info, _, f = move_to(env, [lift_xy[0], lift_xy[1], 0.18], duration=1.3)
+    if frames is not None: frames += f
+    info, f = hold_position(env, duration=0.3)
     if frames is not None: frames += f
     return info["block_height"] > 0.08, info
 

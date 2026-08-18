@@ -65,12 +65,20 @@ def upright_k(g):
 class SO101PickEnv(gym.Env):
     metadata = {"render_modes": ["rgb_array"], "render_fps": 25}
 
-    def __init__(self, render_size=(480, 640), control_hz=25, camera="front"):
+    def __init__(
+        self,
+        render_size=(480, 640),
+        control_hz=25,
+        camera="front",
+        overhead_render_size=(720, 1280),
+    ):
         self.model = load_mj_model(SCENE_XML)
         self.data = mujoco.MjData(self.model)
         self.camera = camera
         h, w = render_size
         self.renderer = mujoco.Renderer(self.model, height=h, width=w)
+        self._overhead_render_size = tuple(overhead_render_size)
+        self._overhead_renderer = None
 
         # 물리 timestep(모델 정의) 대비 제어 주기 → 스텝당 물리 반복 횟수
         self.n_substeps = max(1, int(1.0 / control_hz / self.model.opt.timestep))
@@ -112,10 +120,19 @@ class SO101PickEnv(gym.Env):
         super().reset(seed=seed)
         mujoco.mj_resetData(self.model, self.data)
 
-        # 블록 위치 랜덤화 (yaw도 랜덤)
-        x = self.np_random.uniform(*BLOCK_X)
-        y = self.np_random.uniform(*BLOCK_Y)
-        yaw = self.np_random.uniform(-np.pi, np.pi)
+        # 기본은 블록 위치·yaw 무작위화. 데이터 수집에서는 options로 특정
+        # 위치 구간을 지정할 수 있으며, 일반 reset 동작은 이전과 동일하다.
+        block_pose = (options or {}).get("block_pose")
+        if block_pose is None:
+            x = self.np_random.uniform(*BLOCK_X)
+            y = self.np_random.uniform(*BLOCK_Y)
+            yaw = self.np_random.uniform(-np.pi, np.pi)
+        else:
+            x, y, yaw = map(float, block_pose)
+            if not (BLOCK_X[0] <= x <= BLOCK_X[1]):
+                raise ValueError(f"block x={x} is outside {BLOCK_X}")
+            if not (BLOCK_Y[0] <= y <= BLOCK_Y[1]):
+                raise ValueError(f"block y={y} is outside {BLOCK_Y}")
         quat = np.array([np.cos(yaw / 2), 0, 0, np.sin(yaw / 2)])
         self.data.qpos[self.block_qpos_addr : self.block_qpos_addr + 7] = [
             x, y, BLOCK_HALF_H, *quat,
@@ -163,6 +180,20 @@ class SO101PickEnv(gym.Env):
     def render(self):
         self.renderer.update_scene(self.data, camera=self.camera)
         return self.renderer.render()
+
+    def render_overhead(self):
+        """Render the fixed 52 cm overhead U20CAM approximation at 720p."""
+        if self._overhead_renderer is None:
+            h, w = self._overhead_render_size
+            self._overhead_renderer = mujoco.Renderer(self.model, height=h, width=w)
+        self._overhead_renderer.update_scene(self.data, camera="overhead")
+        return self._overhead_renderer.render()
+
+    def close(self):
+        self.renderer.close()
+        if self._overhead_renderer is not None:
+            self._overhead_renderer.close()
+            self._overhead_renderer = None
 
     # ── 내부 ──────────────────────────────────────────────────
 

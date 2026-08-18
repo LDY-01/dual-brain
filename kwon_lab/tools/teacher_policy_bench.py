@@ -13,15 +13,19 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from envs.so101_pick_env import BLOCK_HALF_H, SO101PickEnv
+from skills.aiming import aim_at
 from skills.primitives import PLACE_RELEASE_HEIGHT, pick, place
 
 
-def run_trial(seed: int) -> dict:
+def run_trial(seed: int, use_aim: bool = False) -> dict:
     env = SO101PickEnv(render_size=(120, 160), camera="wrist")
     env.render = lambda: np.zeros((120, 160, 3), dtype=np.uint8)
     try:
         _, start = env.reset(seed=seed)
-        grasped, _ = pick(env, start["block_pos"])
+        visible = True
+        if use_aim:
+            visible, _ = aim_at(env, "red_block")
+        grasped, _ = pick(env, start["block_pos"]) if visible else (False, start)
         reported_success = False
         if grasped:
             reported_success, _ = place(env, start["target_pos"][:2])
@@ -41,6 +45,7 @@ def run_trial(seed: int) -> dict:
         return {
             "seed": seed,
             "release_height_cm": PLACE_RELEASE_HEIGHT * 100,
+            "visible": bool(visible),
             "grasped": bool(grasped),
             "reported_success": bool(reported_success),
             "stable_success": bool(stable_steps >= 10),
@@ -85,11 +90,12 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--episodes", type=int, default=50)
     parser.add_argument("--seed-start", type=int, default=6000)
+    parser.add_argument("--aim", action="store_true")
     args = parser.parse_args()
 
     rows = []
     for index in range(args.episodes):
-        row = run_trial(args.seed_start + index)
+        row = run_trial(args.seed_start + index, use_aim=args.aim)
         rows.append(row)
         mark = "OK" if row["stable_success"] else "FAIL"
         print(

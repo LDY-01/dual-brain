@@ -6,6 +6,7 @@ __pycache__/
 # Learned models and temporary outputs
 models/
 outputs/
+results/
 
 # Local datasets and recordings
 lerobot_data/
