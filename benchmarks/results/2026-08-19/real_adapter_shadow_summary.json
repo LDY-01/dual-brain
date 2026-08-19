@@ -1,0 +1,47 @@
+{
+  "date": "2026-08-19",
+  "component": "real_so101_adapter_and_policy_shadow",
+  "actual_hardware_connected_during_validation": false,
+  "actual_motor_commands_issued": 0,
+  "implemented": {
+    "physical_joint_observation_bridge": true,
+    "persistent_dual_camera_rgb_source": true,
+    "wrist_center_crop_to_act_640x480": true,
+    "policy_rad_to_lerobot_unit_mapping": true,
+    "per_command_relative_target_guard": true,
+    "shoulder_pan_absolute_guard": true,
+    "jsonl_action_audit": true,
+    "read_only_shadow_serial_connection": true,
+    "act_v22_live_observation_inference_path": true,
+    "active_mode_fail_closed_gate": true
+  },
+  "offline_self_test": {
+    "mapping_round_trip_max_error": 1.1102230246251565e-16,
+    "policy_image_shape": [480, 640, 3],
+    "shadow_goal_position_writes": 0,
+    "shadow_robot_send_calls": 0,
+    "shadow_disconnect_torque_write": false,
+    "calibrated_fake_scene_reached_pick_candidate": true,
+    "preflight_failure_blocks_active_mode": true,
+    "unverified_joint_mapping_blocks_active_mode": true,
+    "missing_confirmation_blocks_active_mode": true,
+    "relative_pan_clamp_test_passed": true,
+    "passed": true
+  },
+  "act_checkpoint_smoke": {
+    "checkpoint": "act_pick_v22",
+    "device": "cpu",
+    "output_shape": [6],
+    "all_output_values_finite": true,
+    "lerobot_action_keys_complete": true
+  },
+  "remaining_real_gates": [
+    "Reconnect robot and both U20CAM cameras in the new workspace",
+    "Run live shadow and inspect proposed joint directions",
+    "Calibrate overhead homographies for the fixed new layout",
+    "Measure the camera-pillar shoulder-pan boundary",
+    "Verify all six policy-to-robot joint mappings on the physical arm",
+    "Approve a separately gated low-speed active runner"
+  ],
+  "interpretation": "The software bridge and no-motion shadow invariant are verified with fakes. Physical mapping, live images, and grasp behavior remain unverified until the new workspace is commissioned."
+}
