@@ -43,7 +43,7 @@ v2.2 기준선 평가 예시:
 uv run python kwon_lab/eval/eval_act_pick.py --version v2.2 --step act_pick_v22 --checkpoint-root artifacts/checkpoints --n-action-steps 10 --episodes 20
 ```
 
-옵티마이저를 포함한 전체 12GB 학습 체크포인트, v1·v2.1 구버전 모델, 평가 영상 모음,
-폐기·중단된 데이터셋과 별도 종합보고서는 포함하지 않습니다.
+옵티마이저를 포함한 전체 12GB 학습 체크포인트, v1·v2.1 구버전 모델, 평가 영상 모음과
+폐기·중단된 데이터셋은 포함하지 않습니다.
 
 API 키, 토큰, `.env`, Hugging Face 인증 파일은 절대 이 디렉터리에 넣지 않습니다.
