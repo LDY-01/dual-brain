@@ -1,0 +1,24 @@
+{
+  "recorded_date": "2026-08-19",
+  "dimensions_mm": [40.0, 40.0, 60.0],
+  "edge_fillet_radius_mm": 1.0,
+  "mass_g": 28.6,
+  "material": "PLA",
+  "finish": "matte",
+  "gripper_contact": "stock SO-101 plastic jaws without rubber pads",
+  "print_profile_evidence": {
+    "confirmed_as_actual_job": false,
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "infill_percent": 15,
+    "infill_pattern": "grid",
+    "top_shell_layers": 5,
+    "top_shell_thickness_mm": 1.0,
+    "bottom_shell_layers": 3,
+    "fuzzy_skin": false
+  },
+  "table_surface": "white matte ceramic at the new workspace; user-confirmed",
+  "table_friction_verified": false,
+  "simulation_sliding_friction_range": [0.25, 0.8],
+  "notes": "Measured mass and STEP outer geometry are authoritative. Slicer screenshots are only a plausible profile, not proof of the actual print job."
+}

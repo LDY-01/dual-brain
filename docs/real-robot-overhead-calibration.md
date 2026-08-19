@@ -16,7 +16,7 @@
 
 ## 카메라 역할 등록
 
-현재 노트북에는 외부 손목·상단 카메라가 모두 연결되어 있지 않다. Windows index 0은 노트북 내장 카메라이며 로봇 카메라 역할로 등록하지 않는다. 로컬 역할 설정의 손목·상단 항목은 모두 미등록 상태다. 설정 파일은 `config/real_camera_roles.local.json`이며 장비별 정보이므로 Git에 포함하지 않는다.
+2026-08-19 현재 Windows PnP 목록에는 외부 `720p HD Camera` 한 대가 보이지만 손목·상단 역할은 모두 미등록 상태다. OpenCV index만으로 역할을 확정하지 않으며 PnP 장치 ID, 물리 USB 포트 라벨, 사람이 확인한 화면을 함께 등록한다. 설정 파일은 `config/real_camera_roles.local.json`이며 장비별 정보이므로 Git에 포함하지 않는다.
 
 현재 상태 확인:
 
@@ -61,6 +61,7 @@ $env:PYTHONPATH='kwon_lab'
   --width 1280 `
   --height 720 `
   --lens-height-m 0.52 `
+  --layout-id <NEW_WORKSPACE_LAYOUT_ID> `
   --plane target_table `
   --output config/overhead_camera_calibration.local.json
 ```

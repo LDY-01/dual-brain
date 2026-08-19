@@ -2,6 +2,7 @@
   "format_version": 1,
   "units": "degrees",
   "recorded_at": null,
+  "layout_id": "new_workspace_YYYY_MM_DD",
   "layout_policy": {
     "camera_pillar_side": "right",
     "task_workspace": "opposite_side_of_camera_pillar",

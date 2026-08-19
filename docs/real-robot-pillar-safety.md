@@ -27,7 +27,8 @@
 
 ```powershell
 uv run python -m kwon_lab.tools.capture_shoulder_pan_limit `
-  --port COM3
+  --port COM3 `
+  --layout-id <NEW_WORKSPACE_LAYOUT_ID>
 ```
 
 7. 방향과 수치가 맞으면 같은 명령에 `--save`를 붙인다. 저장 파일은

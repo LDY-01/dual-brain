@@ -19,7 +19,31 @@ from gymnasium import spaces
 # 원본 SO-ARM100 모델은 손가락이 볼록 껍질로 계산돼 그랩 불가 (PROJECT.md 결정 기록 참조)
 ASSETS = Path(__file__).parent.parent / "assets" / "menagerie_so101"
 SCENE_XML = ASSETS / "pick_scene.xml"
+REAL_BLOCK_SCENE_XML = ASSETS / "pick_scene_real_block.xml"
 BLOCK_HALF_H = 0.03  # 4x4x6cm 박스 (Menagerie 검증 스펙)
+BLOCK_HALF_SIZE = np.array([0.02, 0.02, 0.03], dtype=float)
+OBJECT_PROFILES = {
+    "legacy_96g": {
+        "scene": SCENE_XML,
+        "mass_kg": 0.096,
+        "friction_range": (1.0, 1.0),
+    },
+    "real_28g": {
+        "scene": REAL_BLOCK_SCENE_XML,
+        "mass_kg": 0.0286,
+        "friction_range": (0.25, 0.8),
+    },
+    "sharp_28g": {
+        "scene": SCENE_XML,
+        "mass_kg": 0.0286,
+        "friction_range": (1.0, 1.0),
+    },
+    "rounded_96g": {
+        "scene": REAL_BLOCK_SCENE_XML,
+        "mass_kg": 0.096,
+        "friction_range": (1.0, 1.0),
+    },
+}
 
 # 블록 스폰 구역 (홈 자세 그리퍼 (0.29, 0) 기준 손 닿는 범위)
 BLOCK_X = (0.18, 0.28)
@@ -71,8 +95,36 @@ class SO101PickEnv(gym.Env):
         control_hz=25,
         camera="front",
         overhead_render_size=(720, 1280),
+        object_profile="real_28g",
+        block_sliding_friction_range=None,
     ):
-        self.model = load_mj_model(SCENE_XML)
+        if object_profile not in OBJECT_PROFILES:
+            raise ValueError(
+                f"Unknown object_profile={object_profile!r}; choose {sorted(OBJECT_PROFILES)}"
+            )
+        profile = OBJECT_PROFILES[object_profile]
+        self.object_profile = object_profile
+        self.block_mass_kg = float(profile["mass_kg"])
+        friction_range = (
+            profile["friction_range"]
+            if block_sliding_friction_range is None
+            else block_sliding_friction_range
+        )
+        if len(friction_range) != 2:
+            raise ValueError("block_sliding_friction_range must contain (min, max)")
+        self.block_sliding_friction_range = tuple(map(float, friction_range))
+        if not 0 < self.block_sliding_friction_range[0] <= self.block_sliding_friction_range[1]:
+            raise ValueError("block sliding-friction range must be positive and ordered")
+
+        self.model = load_mj_model(profile["scene"])
+        initial_block_body = mujoco.mj_name2id(
+            self.model, mujoco.mjtObj.mjOBJ_BODY, "block"
+        )
+        compiled_mass = float(self.model.body_mass[initial_block_body])
+        if not np.isclose(compiled_mass, self.block_mass_kg):
+            mass_scale = self.block_mass_kg / compiled_mass
+            self.model.body_mass[initial_block_body] *= mass_scale
+            self.model.body_inertia[initial_block_body] *= mass_scale
         self.data = mujoco.MjData(self.model)
         self.camera = camera
         h, w = render_size
@@ -90,6 +142,10 @@ class SO101PickEnv(gym.Env):
         self.block_geom = mujoco.mj_name2id(
             self.model, mujoco.mjtObj.mjOBJ_GEOM, "block_geom"
         )
+        self.block_floor_pair = mujoco.mj_name2id(
+            self.model, mujoco.mjtObj.mjOBJ_PAIR, "block_floor_contact"
+        )
+        self.block_sliding_friction = self.block_sliding_friction_range[0]
         self.target_site = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, "target_zone")
 
         # 블록 바닥 면적의 목표 구역 포함률을 고정 격자로 근사한다. 격자 중심을
@@ -130,6 +186,21 @@ class SO101PickEnv(gym.Env):
                 raise ValueError(f"block x={x} is outside {BLOCK_X}")
             if not (BLOCK_Y[0] <= y <= BLOCK_Y[1]):
                 raise ValueError(f"block y={y} is outside {BLOCK_Y}")
+
+        # Use a separate deterministic stream for physical randomization so
+        # the same evaluation seed keeps exactly the legacy block XY/yaw.
+        friction_rng = (
+            np.random.default_rng(np.random.SeedSequence([int(seed), 0xB10C]))
+            if seed is not None
+            else self.np_random
+        )
+        self.block_sliding_friction = float(
+            friction_rng.uniform(*self.block_sliding_friction_range)
+        )
+        if self.block_floor_pair >= 0:
+            self.model.pair_friction[self.block_floor_pair, :2] = self.block_sliding_friction
+        else:
+            self.model.geom_friction[self.block_geom, 0] = self.block_sliding_friction
         quat = np.array([np.cos(yaw / 2), 0, 0, np.sin(yaw / 2)])
         self.data.qpos[self.block_qpos_addr : self.block_qpos_addr + 7] = [
             x, y, BLOCK_HALF_H, *quat,
@@ -212,7 +283,9 @@ class SO101PickEnv(gym.Env):
         # 4x6 cm contact face after the block tips onto its side.
         normal_axis = int(np.argmax(np.abs(rotation[2, :])))
         tangent_axes = [axis for axis in range(3) if axis != normal_axis]
-        half_size = self.model.geom_size[self.block_geom]
+        # Mesh geoms do not expose nominal box half-sizes through geom_size.
+        # Use the measured 40x40x60 mm outer bounds for pose-aware scoring.
+        half_size = BLOCK_HALF_SIZE
         tangent_vectors = np.column_stack(
             [
                 rotation[:2, axis] * half_size[axis]
@@ -233,6 +306,9 @@ class SO101PickEnv(gym.Env):
             "dist_to_target": float(np.linalg.norm(block[:2] - target[:2])),
             "target_coverage": coverage,
             "block_height": block_height,
+            "object_profile": self.object_profile,
+            "block_mass_kg": self.block_mass_kg,
+            "block_sliding_friction": self.block_sliding_friction,
             "success": bool(
                 coverage >= SUCCESS_COVERAGE and block_height < BLOCK_ON_TABLE_Z
             ),

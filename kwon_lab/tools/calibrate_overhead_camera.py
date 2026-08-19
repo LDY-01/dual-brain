@@ -160,6 +160,7 @@ def save_calibration(args, reference_payload, names, table_xy, pixels, matrix, e
             "capture_backend": args.backend,
             "requested_resolution": [args.width, args.height],
             "lens_height_m": args.lens_height_m,
+            "layout_id": args.layout_id,
             "coordinate_frame": reference_payload.get("coordinate_frame"),
             "updated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
         }
@@ -254,6 +255,11 @@ def main():
     parser.add_argument("--width", type=int, default=1280)
     parser.add_argument("--height", type=int, default=720)
     parser.add_argument("--lens-height-m", type=float, default=0.52)
+    parser.add_argument(
+        "--layout-id",
+        default="UNSET",
+        help="Stable name for this physical robot/pillar/camera layout.",
+    )
     parser.add_argument(
         "--points",
         type=Path,

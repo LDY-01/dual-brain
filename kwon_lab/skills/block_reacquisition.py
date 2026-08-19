@@ -9,6 +9,7 @@ from dataclasses import dataclass
 import json
 from pathlib import Path
 
+import cv2
 import numpy as np
 
 from skills.aiming import aim_at, locate_color
@@ -80,6 +81,13 @@ OVERHEAD_REACQUIRE_MIN_PIXELS = 100
 OVERHEAD_POSE_MIN_PIXELS = 800
 UPRIGHT_ASPECT_RATIO_MAX = 1.18
 TIPPED_ASPECT_RATIO_MIN = 1.30
+# A side occluder can turn a square top face into a narrow visible rectangle.
+# The major silhouette extent (sqrt(area * aspect)) remains near the original
+# 4 cm edge, while a genuinely tipped 4x6 cm face has a substantially longer
+# major extent at the fixed 720p/52 cm setup.
+UPRIGHT_OCCLUDED_ASPECT_MAX = 1.55
+UPRIGHT_MAJOR_EXTENT_MAX_PX = 54.0
+TIPPED_MAJOR_EXTENT_MIN_PX = 58.0
 CLEAR_VIEW_ACCEPT_SCORE = 0.75
 CLEAR_VIEW_SETTLE_S = 0.20
 
@@ -149,6 +157,25 @@ class OverheadTargetLocation:
     pixels: int
 
 
+def _select_foreground_component(mask, min_pixels):
+    """Prefer the largest non-border color component over unrelated clutter."""
+    binary = np.asarray(mask, dtype=np.uint8)
+    count, labels, stats, _ = cv2.connectedComponentsWithStats(binary, 8)
+    height, width = binary.shape
+    candidates = []
+    for label in range(1, count):
+        x, y, w, h, area = (int(value) for value in stats[label])
+        if area < min_pixels:
+            continue
+        touches_border = x == 0 or y == 0 or x + w == width or y + h == height
+        candidates.append((label, area, touches_border))
+    if not candidates:
+        return np.zeros_like(mask, dtype=bool), 0, False
+    non_border = [item for item in candidates if not item[2]]
+    selected = max(non_border or candidates, key=lambda item: item[1])
+    return labels == selected[0], selected[1], selected[2]
+
+
 def pixel_to_table(pixel, matrix=SIM_OVERHEAD_PIXEL_TO_TABLE):
     """Convert one overhead pixel to table XY using affine or homography."""
     u, v = map(float, pixel)
@@ -209,7 +236,9 @@ def _matrix_for_block_pose(matrix, pose_class):
 def locate_overhead_block(frame, matrix=SIM_OVERHEAD_PIXEL_TO_TABLE):
     """Locate the red block and reject estimates outside the robot workspace."""
     red_mask, _ = color_masks(frame)
-    pixels = int(red_mask.sum())
+    red_mask, pixels, touches_border = _select_foreground_component(
+        red_mask, OVERHEAD_REACQUIRE_MIN_PIXELS
+    )
     if pixels < OVERHEAD_REACQUIRE_MIN_PIXELS:
         return OverheadBlockLocation(
             False, None, None, pixels, False, None, None, "UNKNOWN", 0.0, False
@@ -224,16 +253,10 @@ def locate_overhead_block(frame, matrix=SIM_OVERHEAD_PIXEL_TO_TABLE):
     eigenvalues = np.maximum(eigenvalues, 1e-9)
     aspect_ratio = float(np.sqrt(eigenvalues[-1] / eigenvalues[0]))
     pixel_axis = eigenvectors[:, int(np.argmax(eigenvalues))]
-    height, width = red_mask.shape
-    touches_border = bool(
-        xs.min() == 0
-        or ys.min() == 0
-        or xs.max() == width - 1
-        or ys.max() == height - 1
-    )
     pose_class = "UNKNOWN"
     pose_confidence = 0.0
     if pixels >= OVERHEAD_POSE_MIN_PIXELS and not touches_border:
+        major_extent = float(np.sqrt(pixels * aspect_ratio))
         if aspect_ratio <= UPRIGHT_ASPECT_RATIO_MAX:
             pose_class = "UPRIGHT"
             pose_confidence = float(
@@ -244,7 +267,22 @@ def locate_overhead_block(frame, matrix=SIM_OVERHEAD_PIXEL_TO_TABLE):
                     1.0,
                 )
             )
-        elif aspect_ratio >= TIPPED_ASPECT_RATIO_MIN:
+        elif (
+            aspect_ratio <= UPRIGHT_OCCLUDED_ASPECT_MAX
+            and major_extent <= UPRIGHT_MAJOR_EXTENT_MAX_PX
+        ):
+            pose_class = "UPRIGHT"
+            pose_confidence = float(
+                np.clip(
+                    (UPRIGHT_MAJOR_EXTENT_MAX_PX - major_extent) / 14.0,
+                    0.15,
+                    0.75,
+                )
+            )
+        elif (
+            aspect_ratio >= TIPPED_ASPECT_RATIO_MIN
+            and major_extent >= TIPPED_MAJOR_EXTENT_MIN_PX
+        ):
             pose_class = "TIPPED"
             pose_confidence = float(
                 np.clip(
@@ -396,7 +434,9 @@ def locate_overhead_target(
 ):
     """Locate the green placement zone from the fixed overhead camera."""
     _, green_mask = color_masks(frame)
-    pixels = int(green_mask.sum())
+    green_mask, pixels, _ = _select_foreground_component(
+        green_mask, OVERHEAD_REACQUIRE_MIN_PIXELS
+    )
     if pixels < OVERHEAD_REACQUIRE_MIN_PIXELS:
         return OverheadTargetLocation(False, None, None, pixels)
     ys, xs = np.nonzero(green_mask)

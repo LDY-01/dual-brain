@@ -24,6 +24,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--port", required=True, help="Physical follower port, for example COM3")
     parser.add_argument("--robot-id", default="so101_follower")
     parser.add_argument(
+        "--layout-id",
+        default="UNSET",
+        help="Stable name for this physical robot/pillar layout.",
+    )
+    parser.add_argument(
         "--blocked-direction",
         default="auto",
         choices=("auto", "increasing", "decreasing"),
@@ -45,6 +50,7 @@ def build_payload(args: argparse.Namespace, measured_deg: float, blocked_directi
         "format_version": 1,
         "units": "degrees",
         "recorded_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "layout_id": args.layout_id,
         "layout_policy": {
             "camera_pillar_side": "right",
             "task_workspace": "opposite_side_of_camera_pillar",

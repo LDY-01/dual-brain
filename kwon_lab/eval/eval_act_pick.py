@@ -145,6 +145,7 @@ def rollout(
     pick_verify_steps=DEFAULT_PICK_VERIFY_STEPS,
     full_recovery=False,
     max_task_recoveries=2,
+    aim_mode="current",
 ):
     # ACT samples a VAE latent during action prediction. Seed both the
     # environment and policy RNG so repeated evaluations of a seed are fair.
@@ -158,8 +159,11 @@ def rollout(
         if dual_camera_recovery:
             vision_reaim(env, [])
         else:
-            from skills.aiming import aim_at
-            aim_at(env, "red_block")
+            from skills.aiming import aim_at, aim_at_legacy_v22
+            if aim_mode == "legacy_v22":
+                aim_at_legacy_v22(env, "red_block")
+            else:
+                aim_at(env, "red_block")
         obs = env._get_obs()
     policy.reset()  # ACT 액션 청크 큐 초기화 (에피소드 간 누수 방지)
     frames = [obs["pixels"]]

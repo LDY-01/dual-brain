@@ -1,6 +1,9 @@
 """Role-safe OpenCV camera registration for wrist + overhead RGB."""
 
 import json
+import platform
+import shutil
+import subprocess
 from pathlib import Path
 
 import cv2
@@ -14,8 +17,8 @@ BACKEND_IDS = {
 }
 
 
-def probe_camera(index, backend="dshow", width=1280, height=720, warmup=8):
-    """Open one index, read a frame, and return JSON-safe diagnostics."""
+def capture_camera_frame(index, backend="dshow", width=1280, height=720, warmup=8):
+    """Open one index and return its last warm frame plus diagnostics."""
     if backend not in BACKEND_IDS:
         raise ValueError(f"Unsupported camera backend: {backend}")
     capture = cv2.VideoCapture(int(index), BACKEND_IDS[backend])
@@ -31,7 +34,7 @@ def probe_camera(index, backend="dshow", width=1280, height=720, warmup=8):
     }
     if not report["opened"]:
         capture.release()
-        return report
+        return None, report
     capture.set(cv2.CAP_PROP_FRAME_WIDTH, int(width))
     capture.set(cv2.CAP_PROP_FRAME_HEIGHT, int(height))
     frame = None
@@ -49,9 +52,64 @@ def probe_camera(index, backend="dshow", width=1280, height=720, warmup=8):
                 "reported_fps": float(capture.get(cv2.CAP_PROP_FPS)),
             }
         )
-        return report
+        return frame, report
     finally:
         capture.release()
+
+
+def probe_camera(index, backend="dshow", width=1280, height=720, warmup=8):
+    """Open one index, read a frame, and return JSON-safe diagnostics."""
+    _, report = capture_camera_frame(index, backend, width, height, warmup)
+    return report
+
+
+def enumerate_windows_camera_devices():
+    """Return stable Windows PnP identifiers when the operating system exposes them.
+
+    OpenCV indices are not stable across USB reconnects. PnP instance IDs are
+    therefore recorded as an additional audit signal, but visual confirmation
+    remains mandatory because Windows does not expose a reliable index mapping.
+    """
+    if platform.system() != "Windows":
+        return {"supported": False, "devices": [], "reason": "not_windows"}
+    shell = shutil.which("pwsh") or shutil.which("powershell")
+    if shell is None:
+        return {"supported": False, "devices": [], "reason": "powershell_missing"}
+    command = (
+        "[Console]::OutputEncoding=[Text.Encoding]::UTF8; "
+        "Get-CimInstance Win32_PnPEntity | "
+        "Where-Object { $_.PNPClass -in @('Camera','Image') } | "
+        "Select-Object Name,PNPClass,DeviceID,Status | ConvertTo-Json -Compress"
+    )
+    try:
+        completed = subprocess.run(
+            [shell, "-NoProfile", "-Command", command],
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=10,
+        )
+        raw = completed.stdout.strip()
+        payload = [] if not raw else json.loads(raw)
+        if isinstance(payload, dict):
+            payload = [payload]
+        devices = [
+            {
+                "name": item.get("Name"),
+                "pnp_class": item.get("PNPClass"),
+                "device_instance_id": item.get("DeviceID"),
+                "status": item.get("Status"),
+            }
+            for item in payload
+        ]
+        return {"supported": True, "devices": devices, "reason": None}
+    except (subprocess.SubprocessError, json.JSONDecodeError, OSError) as exc:
+        return {
+            "supported": False,
+            "devices": [],
+            "reason": f"enumeration_failed:{type(exc).__name__}",
+        }
 
 
 def load_camera_registry(path):
@@ -66,6 +124,7 @@ def load_camera_registry(path):
     if unknown:
         raise ValueError(f"Unknown camera roles: {sorted(unknown)}")
     indices = []
+    device_ids = []
     for role in CAMERA_ROLES:
         entry = roles.get(role)
         if entry is None:
@@ -75,15 +134,38 @@ def load_camera_registry(path):
         if entry.get("backend", "dshow") not in BACKEND_IDS:
             raise ValueError(f"Role {role!r} has an unsupported backend")
         indices.append(entry["index"])
+        device_id = entry.get("device_instance_id")
+        if device_id is not None:
+            if not isinstance(device_id, str) or not device_id.strip():
+                raise ValueError(f"Role {role!r} has an invalid device_instance_id")
+            device_ids.append(device_id.casefold())
     if len(indices) != len(set(indices)):
         raise ValueError("Wrist and overhead roles cannot use the same camera index")
+    if len(device_ids) != len(set(device_ids)):
+        raise ValueError("Wrist and overhead roles cannot use the same PnP device")
     return payload
 
 
-def camera_registry_status(path, probe=True):
+def camera_registry_status(path, probe=True, include_devices=True):
     """Validate role uniqueness and optionally verify current frame access."""
     payload = load_camera_registry(path)
-    status = {"roles": {}, "dual_camera_ready": True}
+    devices = (
+        enumerate_windows_camera_devices()
+        if include_devices
+        else {"supported": False, "devices": [], "reason": "not_requested"}
+    )
+    present_ids = {
+        str(item.get("device_instance_id", "")).casefold()
+        for item in devices["devices"]
+    }
+    status = {
+        "roles": {},
+        "dual_camera_ready": True,
+        "windows_camera_devices": devices,
+    }
+    require_identity = payload.get("startup_policy", {}).get(
+        "require_view_confirmation_after_usb_change", True
+    )
     for role in CAMERA_ROLES:
         entry = payload["roles"].get(role)
         if entry is None:
@@ -100,7 +182,24 @@ def camera_registry_status(path, probe=True):
             "backend": entry.get("backend", "dshow"),
             "expected_view": entry.get("expected_view"),
             "physical_usb_port": entry.get("physical_usb_port"),
+            "device_name": entry.get("device_name"),
+            "device_instance_id": entry.get("device_instance_id"),
         }
+        expected_id = entry.get("device_instance_id")
+        if expected_id is not None:
+            item["pnp_device_present"] = expected_id.casefold() in present_ids
+            if devices["supported"] and not item["pnp_device_present"]:
+                status["dual_camera_ready"] = False
+        else:
+            item["pnp_device_present"] = None
+        item["device_identity_complete"] = bool(
+            expected_id
+            and entry.get("physical_usb_port")
+            and entry.get("physical_usb_port") != "unassigned"
+            and entry.get("confirmation") == "user_visually_confirmed"
+        )
+        if require_identity and not item["device_identity_complete"]:
+            status["dual_camera_ready"] = False
         if probe:
             diagnostics = probe_camera(
                 entry["index"],
@@ -128,6 +227,10 @@ def require_dual_camera_ready(path):
                 reasons.append(f"{role}=not_registered")
             elif not item["available"]:
                 reasons.append(f"{role}=unavailable")
+            elif item.get("pnp_device_present") is False:
+                reasons.append(f"{role}=registered_pnp_device_missing")
+            elif not item.get("device_identity_complete"):
+                reasons.append(f"{role}=device_identity_incomplete")
         raise RuntimeError(
             "Dual-camera startup guard blocked robot motion: " + ", ".join(reasons)
         )

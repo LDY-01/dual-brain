@@ -12,6 +12,7 @@ import numpy as np
 
 CENTER = (320, 240)
 SCAN_POSE = (0.0, 0.0, 0.0, 0.0, 0.0)
+LEGACY_V22_SCAN_POSE = (0.0, -0.6, 0.3, 1.2, 0.0)
 
 
 def locate_color(frame, target: str):
@@ -19,6 +20,21 @@ def locate_color(frame, target: str):
     r, g, b = (frame[:, :, i].astype(int) for i in range(3))
     masks = {
         "red_block": (r > 70) & (r > 2.5 * g) & (r > 2.5 * b),
+        "blue_ball": (b > 130) & (b > 2 * g) & (r < 80),
+        "green_zone": (g > 110) & (g > 2 * r) & (g > 2 * b),
+    }
+    mask = masks.get(target)
+    if mask is None or int(mask.sum()) < 150:
+        return None
+    ys, xs = np.nonzero(mask)
+    return float(xs.mean()), float(ys.mean())
+
+
+def _locate_color_legacy_v22(frame, target: str):
+    """Exact color mask used when the Mac v2.2 dataset/eval was created."""
+    r, g, b = (frame[:, :, i].astype(int) for i in range(3))
+    masks = {
+        "red_block": (r > 100) & (r > 4 * g) & (r > 4 * b),
         "blue_ball": (b > 130) & (b > 2 * g) & (r < 80),
         "green_zone": (g > 110) & (g > 2 * r) & (g > 2 * b),
     }
@@ -69,6 +85,71 @@ def aim_at(
         if found:  # 찾았는데 센터링 실패 → 스캔부터 다시 (다른 초기 조건)
             _move(env, [0, -0.6, 0.3, 1.2, 0, env.data.ctrl[5]], 0.5, frames)
     return found, False
+
+
+def aim_at_legacy_v22(env, target: str = "red_block", frames=None, attempts: int = 2):
+    """Reproduce the exact pre-policy aiming distribution used by ACT v2.2."""
+    found = False
+    for _ in range(max(1, attempts)):
+        found, centered = _aim_once_legacy_v22(env, target, frames)
+        if centered:
+            return True, True
+        if found:
+            _move(
+                env,
+                [*LEGACY_V22_SCAN_POSE, float(env.data.ctrl[5])],
+                0.5,
+                frames,
+            )
+    return found, False
+
+
+def _aim_once_legacy_v22(env, target, frames):
+    """Frozen 2026-08-12 v2.2 aiming code for controlled comparisons."""
+    ctrl = env.data.ctrl[:6].copy()
+    pan, lift, elbow, wf = (float(ctrl[index]) for index in range(4))
+    loc = _locate_color_legacy_v22(_wrist(env), target)
+    if loc is None:
+        lift, elbow, wf = LEGACY_V22_SCAN_POSE[1:4]
+        for pan in np.linspace(-1.2, 1.2, 7):
+            _move(env, [pan, lift, elbow, wf, 0, ctrl[5]], 0.5, frames)
+            loc = _locate_color_legacy_v22(_wrist(env), target)
+            if loc is not None:
+                break
+    if loc is None:
+        return False, False
+
+    tol = 50 if target == "green_zone" else 20
+    gain, sign_p, sign_w = 0.0015, 1.0, 1.0
+    prev = None
+    dx = dy = 999.0
+    for _ in range(14):
+        cx, cy = loc
+        dx, dy = cx - CENTER[0], cy - CENTER[1]
+        if abs(dx) < tol and abs(dy) < tol:
+            break
+        if prev is not None:
+            if abs(dx) > abs(prev[0]) + 10:
+                sign_p = -sign_p
+            if abs(dy) > abs(prev[1]) + 10:
+                sign_w = -sign_w
+        prev = (dx, dy)
+        pan_old, wf_old = pan, wf
+        pan = float(np.clip(pan - sign_p * gain * dx, -1.9, 1.9))
+        wf = float(np.clip(wf + sign_w * gain * dy, -1.6, 1.6))
+        if abs(wf - wf_old) < 1e-4 and abs(dy) > 50:
+            lift = float(np.clip(lift - 0.12 * np.sign(dy), -1.7, 1.7))
+        _move(env, [pan, lift, elbow, wf, 0, env.data.ctrl[5]], 0.35, frames)
+        nxt = _locate_color_legacy_v22(_wrist(env), target)
+        if nxt is None:
+            pan, wf = pan_old, wf_old
+            _move(env, [pan, lift, elbow, wf, 0, env.data.ctrl[5]], 0.35, frames)
+            gain *= 0.5
+            nxt = _locate_color_legacy_v22(_wrist(env), target)
+            if nxt is None:
+                return True, False
+        loc = nxt
+    return True, bool(abs(dx) < tol + 5 and abs(dy) < tol + 5)
 
 
 def _aim_once(env, target, frames, allow_scan=True):
