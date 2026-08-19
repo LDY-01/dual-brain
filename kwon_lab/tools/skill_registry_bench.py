@@ -79,12 +79,42 @@ def run_contract_checks():
     recovered = executor.execute("pick")
     transported = executor.execute("transport")
     timed_out = executor.execute("slow")
+
+    fake_time = [0.0]
+    cooperative_steps = [0]
+
+    def fake_clock():
+        return fake_time[0]
+
+    def cooperative(context, _params):
+        for _ in range(10):
+            cooperative_steps[0] += 1
+            fake_time[0] += 0.4
+            context.check_deadline()
+        return {"success": True}
+
+    bounded_registry = SkillRegistry()
+    bounded_registry.register(
+        SkillSpec(
+            "bounded",
+            cooperative,
+            lambda _context, result: result["success"],
+            timeout_s=1.0,
+        )
+    )
+    bounded = SkillExecutor(
+        bounded_registry,
+        SkillContext(runtime=None, clock=fake_clock),
+    ).execute("bounded")
     checks = {
         "precondition_blocked": blocked.status == "blocked",
         "recovery_completed": recovered.status == "recovered",
         "effect_applied": state["holding"] and state["recoveries"] == 1,
         "transport_after_recovery": transported.success,
         "timeout_rejected": timed_out.status == "timed_out",
+        "cooperative_timeout_interrupted": (
+            bounded.status == "timed_out" and cooperative_steps[0] == 3
+        ),
     }
     if not all(checks.values()):
         raise AssertionError(checks)

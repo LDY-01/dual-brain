@@ -534,6 +534,7 @@ def reacquire_block(
         [x, y, CAMERA_APPROACH_HEIGHT],
         camera_seed,
         point_down=False,
+        deadline_check=getattr(env, "_skill_deadline_check", None),
     )
     _, camera_frames = move_joints(
         env, q_target, gripper=GRIPPER_OPEN, duration=1.0
@@ -587,6 +588,7 @@ def reacquire_block(
                 q_now,
                 point_down=True,
                 pitch_deg=pitch,
+                deadline_check=getattr(env, "_skill_deadline_check", None),
             )
             candidates.append((ik_error, height, pitch, q_target))
         ik_error, height, pitch, q_target = min(
@@ -734,6 +736,22 @@ def reacquire_and_pick(
         frames=frames,
         on_lift_observation=observe_lift,
     )
+    if recovery_config_index is not None:
+        # Recovered blocks are often tipped and sit less deeply in the jaws.
+        # Re-assert closure and let the contact settle before transport.
+        _, secure_frames = set_gripper(
+            env,
+            -0.1,
+            duration=0.25,
+            on_observation=observe_lift,
+        )
+        frames.extend(secure_frames)
+        _, settle_frames = hold_position(
+            env,
+            duration=0.35,
+            on_observation=observe_lift,
+        )
+        frames.extend(settle_frames)
     final_obs = env._get_obs()
     final_gripper = float(final_obs["agent_pos"][-1])
     final_visible = observe_colors(final_obs["pixels"]).red_block.visible
@@ -769,7 +787,6 @@ def pick_until_verified(
         "block_not_visible_overhead",
         "block_outside_workspace",
         "block_pose_unknown_after_clear_views",
-        "coarse_position_unreachable",
     }
     configs = (
         tuple((None, None, None) for _ in range(max_attempts))

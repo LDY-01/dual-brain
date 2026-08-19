@@ -24,6 +24,10 @@ SkillEffect = Callable[["SkillContext", Any, bool], None]
 ConditionCheck = Callable[["SkillContext"], bool]
 
 
+class SkillDeadlineExceeded(TimeoutError):
+    """Raised by a cooperative robot runner when its active budget expires."""
+
+
 @dataclass(frozen=True)
 class Precondition:
     name: str
@@ -55,6 +59,21 @@ class SkillContext:
     state: dict[str, Any] = field(default_factory=dict)
     audit_path: Path | None = None
     clock: Callable[[], float] = time.monotonic
+    active_deadline_s: float | None = None
+    operation_deadline_s: float | None = None
+
+    def check_deadline(self) -> None:
+        now = self.clock()
+        if (
+            self.operation_deadline_s is not None
+            and now > self.operation_deadline_s
+        ):
+            raise SkillDeadlineExceeded("overall task deadline exceeded")
+        if (
+            self.active_deadline_s is not None
+            and now > self.active_deadline_s
+        ):
+            raise SkillDeadlineExceeded("active skill deadline exceeded")
 
 
 @dataclass
@@ -156,6 +175,8 @@ class SkillExecutor:
                 return execution
 
         start = self.context.clock()
+        previous_deadline = self.context.active_deadline_s
+        self.context.active_deadline_s = start + spec.timeout_s
         result = None
         status = "failed"
         failure_reason = None
@@ -175,11 +196,20 @@ class SkillExecutor:
                     failure_reason = self._failure_reason(result)
             if spec.apply_effects is not None:
                 spec.apply_effects(self.context, result, succeeded)
+        except SkillDeadlineExceeded as exc:
+            elapsed = max(0.0, self.context.clock() - start)
+            status = "timed_out"
+            succeeded = False
+            failure_reason = f"{exc}; skill timeout {spec.timeout_s:.3f}s"
+            if spec.apply_effects is not None:
+                spec.apply_effects(self.context, None, False)
         except Exception as exc:
             elapsed = max(0.0, self.context.clock() - start)
             status = "failed"
             succeeded = False
             failure_reason = f"{type(exc).__name__}:{exc}"
+        finally:
+            self.context.active_deadline_s = previous_deadline
 
         execution = SkillExecution(
             skill=name,

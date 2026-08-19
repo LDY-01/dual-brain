@@ -13,7 +13,8 @@
     "recovery_completed": true,
     "effect_applied": true,
     "transport_after_recovery": true,
-    "timeout_rejected": true
+    "timeout_rejected": true,
+    "cooperative_timeout_interrupted": true
   },
   "mujoco": {
     "seed": 9101,

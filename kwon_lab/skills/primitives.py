@@ -25,7 +25,8 @@ def _skew(v):
 
 
 def solve_ik(model, target_pos, q_init, point_down=False, pitch_deg=60, n_iter=300,
-             tol=0.002, damping=0.05, step=0.5, ori_weight=0.3):
+             tol=0.002, damping=0.05, step=0.5, ori_weight=0.3,
+             deadline_check=None):
     """목표 위치(x,y,z)에 그리퍼 끝(gripperframe)을 보내는 팔 관절각 5개를 푼다.
 
     point_down=True면 손가락 방향(사이트 x축)을 수직 아래(0,0,-1)로 정렬하는
@@ -54,6 +55,8 @@ def solve_ik(model, target_pos, q_init, point_down=False, pitch_deg=60, n_iter=3
 
     pos_err = np.inf
     for _ in range(n_iter):
+        if deadline_check is not None:
+            deadline_check()
         data.qpos[qadr] = q
         mujoco.mj_forward(model, data)
         e_pos = target - data.site_xpos[site_id]
@@ -94,13 +97,25 @@ def move_to(
     Returns: (마지막 info, IK 잔여 오차 m, 프레임 리스트)
     """
     q_now = env.data.qpos[:5].copy()
-    q_target, ik_err = solve_ik(env.model, xyz, q_now, point_down=point_down, pitch_deg=pitch_deg)
+    deadline_check = getattr(env, "_skill_deadline_check", None)
+    if deadline_check is not None:
+        deadline_check()
+    q_target, ik_err = solve_ik(
+        env.model,
+        xyz,
+        q_now,
+        point_down=point_down,
+        pitch_deg=pitch_deg,
+        deadline_check=deadline_check,
+    )
     g_now = float(env.data.ctrl[5])
     g_target = g_now if gripper is None else float(gripper)
 
     frames, info = [], None
     n_steps = max(1, int(duration * env.metadata["render_fps"]))
     for i in range(n_steps):
+        if deadline_check is not None:
+            deadline_check()
         a = (i + 1) / n_steps
         action = np.concatenate([q_now + a * (q_target - q_now), [g_now + a * (g_target - g_now)]])
         obs, _, _, _, info = env.step(action)
@@ -118,7 +133,10 @@ def move_joints(env, q_target, gripper=None, duration=1.0):
     g_target = g_now if gripper is None else float(gripper)
     frames, info = [], env._get_info()
     n_steps = max(1, int(duration * env.metadata["render_fps"]))
+    deadline_check = getattr(env, "_skill_deadline_check", None)
     for i in range(n_steps):
+        if deadline_check is not None:
+            deadline_check()
         a = (i + 1) / n_steps
         action = np.concatenate(
             [q_now + a * (q_target - q_now), [g_now + a * (g_target - g_now)]]
@@ -141,7 +159,10 @@ def set_gripper(env, value, duration=0.6, on_observation=None):
     arm = env.data.ctrl[:5].copy()
     g_now = float(env.data.ctrl[5])
     n_steps = max(1, int(duration * env.metadata["render_fps"]))
+    deadline_check = getattr(env, "_skill_deadline_check", None)
     for i in range(n_steps):
+        if deadline_check is not None:
+            deadline_check()
         a = (i + 1) / n_steps
         obs, _, _, _, info = env.step(np.concatenate([arm, [g_now + a * (value - g_now)]]))
         frames.append(obs["pixels"])
@@ -155,7 +176,10 @@ def hold_position(env, duration=0.2, on_observation=None):
     frames, info = [], env._get_info()
     n_steps = max(1, int(duration * env.metadata["render_fps"]))
     action = env.data.ctrl.copy()
+    deadline_check = getattr(env, "_skill_deadline_check", None)
     for _ in range(n_steps):
+        if deadline_check is not None:
+            deadline_check()
         obs, _, _, _, info = env.step(action)
         frames.append(obs["pixels"])
         if on_observation is not None:

@@ -46,6 +46,7 @@ PLACE_SETTLE_DURATION_S = 1.2
 PLACE_CLEAR_POSITION = (0.30, 0.0, 0.20)
 PLACE_FINAL_CONFIRM_FRAMES = 10
 PLACE_FINAL_MAX_SPREAD_PX = 3.0
+PLACE_CAMERA_SUCCESS_COVERAGE = 0.78
 
 
 @dataclass
@@ -164,6 +165,7 @@ def place_verified_transport(
     frames=None,
     target_matrix=SIM_OVERHEAD_TARGET_PIXEL_TO_TABLE,
     on_place_step=None,
+    conservative=False,
 ):
     """Descend to 6 cm, visually align, release, and verify 75% coverage.
 
@@ -189,6 +191,7 @@ def place_verified_transport(
         "drop_detected_step": None,
         "released": False,
         "stable_success_frames_required": PLACE_FINAL_CONFIRM_FRAMES,
+        "camera_success_coverage_required": PLACE_CAMERA_SUCCESS_COVERAGE,
         "image_target_coverage": 0.0,
         "table_area_ratio": 0.0,
         "place_evidence_frames": 0,
@@ -222,13 +225,100 @@ def place_verified_transport(
         if on_place_step is not None:
             on_place_step(env, step, signals)
 
+    place_monitor = OverheadTaskMonitor(overhead_calibration_frame)
+    final_history = deque(maxlen=PLACE_FINAL_CONFIRM_FRAMES)
+
+    def observe_release_motion(obs):
+        nonlocal step
+        step += 1
+        frames.append(obs["pixels"])
+        report["place_steps"] = step
+
+    def supervise_final_settle(obs):
+        nonlocal step
+        step += 1
+        frames.append(obs["pixels"])
+        overhead_frame = env.render_overhead()
+        _, signals = place_monitor.update(
+            overhead_frame, obs["agent_pos"], grasp_confirmed=True
+        )
+        report["place_steps"] = step
+        report["table_area_ratio"] = float(signals["table_area_ratio"])
+        red, _ = color_masks(overhead_frame)
+        red_area = int(red.sum())
+        if red_area >= 100:
+            ys, xs = np.nonzero(red)
+            centroid = np.array([float(xs.mean()), float(ys.mean())])
+            coverage = float(
+                np.count_nonzero(red & place_monitor.target_mask) / red_area
+            )
+        else:
+            centroid = None
+            coverage = 0.0
+        final_history.append((centroid, coverage))
+        stable = False
+        if (
+            len(final_history) == PLACE_FINAL_CONFIRM_FRAMES
+            and all(item[0] is not None for item in final_history)
+            and all(
+                item[1] >= PLACE_CAMERA_SUCCESS_COVERAGE
+                for item in final_history
+            )
+        ):
+            centroids = np.asarray([item[0] for item in final_history])
+            center = np.mean(centroids, axis=0)
+            spread = float(
+                np.linalg.norm(centroids - center, axis=1).max()
+            )
+            stable = spread <= PLACE_FINAL_MAX_SPREAD_PX
+        report["place_evidence_frames"] = (
+            PLACE_FINAL_CONFIRM_FRAMES if stable else 0
+        )
+        report["image_target_coverage"] = coverage
+
+    def release_clear_and_verify():
+        final_history.clear()
+        set_gripper(
+            env,
+            GRIPPER_OPEN,
+            duration=0.45,
+            on_observation=observe_release_motion,
+        )
+        report["released"] = True
+        ee = _end_effector_position(env)
+        move_to(
+            env,
+            [ee[0], ee[1], PLACE_APPROACH_HEIGHT],
+            gripper=GRIPPER_OPEN,
+            duration=0.8,
+            on_observation=observe_release_motion,
+        )
+        move_to(
+            env,
+            PLACE_CLEAR_POSITION,
+            gripper=GRIPPER_OPEN,
+            duration=1.0,
+            on_observation=observe_release_motion,
+        )
+        hold_position(
+            env,
+            duration=PLACE_SETTLE_DURATION_S,
+            on_observation=supervise_final_settle,
+        )
+        confirmed = (
+            report["place_evidence_frames"] >= PLACE_FINAL_CONFIRM_FRAMES
+        )
+        report["camera_place_confirmed"] = confirmed
+        report["next_state"] = "DONE" if confirmed else "PICK"
+        return confirmed
+
     try:
         # First descend vertically to the safe place approach height.
         ee = _end_effector_position(env)
         move_to(
             env,
             [ee[0], ee[1], PLACE_APPROACH_HEIGHT],
-            duration=0.8,
+            duration=1.2 if conservative else 0.8,
             on_observation=supervise_motion,
         )
 
@@ -238,7 +328,7 @@ def place_verified_transport(
         move_to(
             env,
             [ee[0], ee[1], PLACE_RELEASE_HEIGHT],
-            duration=0.9,
+            duration=1.4 if conservative else 0.9,
             on_observation=supervise_motion,
         )
 
@@ -261,8 +351,9 @@ def place_verified_transport(
                 break
             delta_xy = linear_map @ pixel_error
             delta_norm = float(np.linalg.norm(delta_xy))
-            if delta_norm > PLACE_ALIGN_MAX_STEP_M:
-                delta_xy *= PLACE_ALIGN_MAX_STEP_M / delta_norm
+            max_step = 0.015 if conservative else PLACE_ALIGN_MAX_STEP_M
+            if delta_norm > max_step:
+                delta_xy *= max_step / delta_norm
             ee = _end_effector_position(env)
             move_to(
                 env,
@@ -271,102 +362,21 @@ def place_verified_transport(
                     ee[1] + float(delta_xy[1]),
                     PLACE_RELEASE_HEIGHT,
                 ],
-                duration=0.45,
+                duration=0.7 if conservative else 0.45,
                 on_observation=supervise_motion,
             )
             report["alignment_iterations"] += 1
     except _TransportDropDetected as event:
         report["drop_detected"] = True
         report["drop_detected_step"] = event.step
-        report["failure_reason"] = "drop_during_place_approach"
+        landed_in_target = release_clear_and_verify()
+        report["drop_landed_in_target"] = bool(landed_in_target)
+        report["failure_reason"] = (
+            None if landed_in_target else "drop_during_place_approach"
+        )
         return report
 
-    # Intentional release starts here.  Switch from drop supervision to the
-    # overhead success monitor so opening the gripper is not treated as a fault.
-    place_monitor = OverheadTaskMonitor(overhead_calibration_frame)
-    final_history = deque(maxlen=PLACE_FINAL_CONFIRM_FRAMES)
-
-    def observe_release_motion(obs):
-        nonlocal step
-        step += 1
-        frames.append(obs["pixels"])
-        report["place_steps"] = step
-
-    def supervise_final_settle(obs):
-        nonlocal step
-        step += 1
-        frames.append(obs["pixels"])
-        overhead_frame = env.render_overhead()
-        _, signals = place_monitor.update(
-            overhead_frame, obs["agent_pos"], grasp_confirmed=True
-        )
-        report["place_steps"] = step
-        report["image_target_coverage"] = float(
-            signals["image_target_coverage"]
-        )
-        report["table_area_ratio"] = float(signals["table_area_ratio"])
-        red, _ = color_masks(overhead_frame)
-        red_area = int(red.sum())
-        if red_area >= 100:
-            ys, xs = np.nonzero(red)
-            centroid = np.array([float(xs.mean()), float(ys.mean())])
-            coverage = float(
-                np.count_nonzero(red & place_monitor.target_mask) / red_area
-            )
-        else:
-            centroid = None
-            coverage = 0.0
-        final_history.append((centroid, coverage))
-        stable = False
-        if (
-            len(final_history) == PLACE_FINAL_CONFIRM_FRAMES
-            and all(item[0] is not None for item in final_history)
-            and all(item[1] >= 0.75 for item in final_history)
-        ):
-            centroids = np.asarray([item[0] for item in final_history])
-            center = np.mean(centroids, axis=0)
-            spread = float(
-                np.linalg.norm(centroids - center, axis=1).max()
-            )
-            stable = spread <= PLACE_FINAL_MAX_SPREAD_PX
-        report["place_evidence_frames"] = (
-            PLACE_FINAL_CONFIRM_FRAMES if stable else 0
-        )
-        report["image_target_coverage"] = coverage
-
-    set_gripper(
-        env,
-        GRIPPER_OPEN,
-        duration=0.45,
-        on_observation=observe_release_motion,
-    )
-    report["released"] = True
-    # Clear the fixed camera's view before judging the final placement.  This
-    # also distinguishes a table-stationary block from one still caught in the
-    # open fingers: a caught block follows the retreating arm.
-    ee = _end_effector_position(env)
-    move_to(
-        env,
-        [ee[0], ee[1], PLACE_APPROACH_HEIGHT],
-        gripper=GRIPPER_OPEN,
-        duration=0.8,
-        on_observation=observe_release_motion,
-    )
-    move_to(
-        env,
-        PLACE_CLEAR_POSITION,
-        gripper=GRIPPER_OPEN,
-        duration=1.0,
-        on_observation=observe_release_motion,
-    )
-    hold_position(
-        env,
-        duration=PLACE_SETTLE_DURATION_S,
-        on_observation=supervise_final_settle,
-    )
-    confirmed = report["place_evidence_frames"] >= PLACE_FINAL_CONFIRM_FRAMES
-    report["camera_place_confirmed"] = confirmed
-    report["next_state"] = "DONE" if confirmed else "PICK"
+    confirmed = release_clear_and_verify()
     report["failure_reason"] = None if confirmed else "place_not_confirmed"
     return report
 
