@@ -74,6 +74,10 @@ SIM_OVERHEAD_BLOCK_PIXEL_TO_TABLE = {
 WORKSPACE_X = (0.10, 0.32)
 WORKSPACE_Y = (-0.16, 0.24)
 WORKSPACE_EDGE_GUARD_M = 0.04
+BOUNDARY_PICK_INWARD_BIAS_M = 0.008
+BOUNDARY_PICK_TARGET_MARGIN_M = 0.010
+BOUNDARY_PREGRASP_MARGIN_M = 0.005
+BOUNDARY_MIN_APPROACH_M = 0.005
 MAX_COARSE_IK_ERROR_M = 0.015
 APPROACH_CONFIGS = (
     (0.16, 30),
@@ -151,6 +155,16 @@ TIPPED_RECOVERY_PICK_CONFIGS = (
     ((-0.01, 0.01), TIPPED_BLOCK_CENTER_Z, np.pi / 2),
     ((0.0, 0.0), 0.025, 0.0),
 )
+
+
+def select_recovery_pick_config(pose_class, config_cursor):
+    """Select a pose-aware recovery config without pinning later calls last."""
+    configs = {
+        "UPRIGHT": UPRIGHT_RECOVERY_PICK_CONFIGS,
+        "TIPPED": TIPPED_RECOVERY_PICK_CONFIGS,
+    }.get(pose_class, RECOVERY_PICK_CONFIGS)
+    applied_index = int(config_cursor) % len(configs)
+    return configs[applied_index], applied_index, len(configs)
 
 
 @dataclass(frozen=True)
@@ -492,10 +506,11 @@ def boundary_inward_direction(
         "y_min": np.array([0.0, 1.0]),
         "y_max": np.array([0.0, -1.0]),
     }
+    edge_guards = {name: float(edge_guard_m) for name in distances}
     active = [
         name
         for name, distance in distances.items()
-        if distance <= float(edge_guard_m)
+        if distance <= edge_guards[name]
     ]
     if not active:
         return None, distances
@@ -507,6 +522,96 @@ def boundary_inward_direction(
     if norm < 1e-9:
         return None, distances
     return direction / norm, distances
+
+
+def boundary_safe_pick_plan(
+    table_xy,
+    pick_xy_offset=(0.0, 0.0),
+    edge_guard_m=WORKSPACE_EDGE_GUARD_M,
+):
+    """Keep a boundary recovery target and pre-grasp inside the workspace."""
+    table_xy = np.asarray(table_xy, dtype=float)
+    offset = np.asarray(pick_xy_offset, dtype=float)
+    edge_guards = {
+        name: float(edge_guard_m)
+        for name in ("x_min", "x_max", "y_min", "y_max")
+    }
+    inward_direction, edge_distances = boundary_inward_direction(
+        table_xy, edge_guard_m
+    )
+    if inward_direction is None:
+        return {
+            "active": False,
+            "mode": "inactive",
+            "inward_direction_xy": None,
+            "edge_distances_m": edge_distances,
+            "edge_guards_m": edge_guards,
+            "pick_xy_offset_m": tuple(map(float, offset)),
+            "pick_target_table_xy": tuple(map(float, table_xy + offset)),
+            "pregrasp_table_xy": None,
+            "approach_distance_m": 0.06,
+        }
+
+    # Remove a recovery offset component that points back toward the edge.
+    inward_component = float(np.dot(offset, inward_direction))
+    if inward_component < 0.0:
+        offset = offset - inward_component * inward_direction
+    target = (
+        table_xy
+        + offset
+        + BOUNDARY_PICK_INWARD_BIAS_M * inward_direction
+    )
+    target[0] = np.clip(
+        target[0],
+        WORKSPACE_X[0] + BOUNDARY_PICK_TARGET_MARGIN_M,
+        WORKSPACE_X[1] - BOUNDARY_PICK_TARGET_MARGIN_M,
+    )
+    target[1] = np.clip(
+        target[1],
+        WORKSPACE_Y[0] + BOUNDARY_PICK_TARGET_MARGIN_M,
+        WORKSPACE_Y[1] - BOUNDARY_PICK_TARGET_MARGIN_M,
+    )
+    offset = target - table_xy
+
+    target_distances = {
+        "x_min": target[0] - WORKSPACE_X[0],
+        "x_max": WORKSPACE_X[1] - target[0],
+        "y_min": target[1] - WORKSPACE_Y[0],
+        "y_max": WORKSPACE_Y[1] - target[1],
+    }
+    entry_edges = [
+        name
+        for name, distance in target_distances.items()
+        if np.dot(
+            {
+                "x_min": np.array([1.0, 0.0]),
+                "x_max": np.array([-1.0, 0.0]),
+                "y_min": np.array([0.0, 1.0]),
+                "y_max": np.array([0.0, -1.0]),
+            }[name],
+            inward_direction,
+        ) > 0.0
+    ]
+    safe_entry_length = min(target_distances[name] for name in entry_edges)
+    approach_distance = float(
+        np.clip(
+            safe_entry_length - BOUNDARY_PREGRASP_MARGIN_M,
+            BOUNDARY_MIN_APPROACH_M,
+            0.04,
+        )
+    )
+    pregrasp = target - approach_distance * inward_direction
+    return {
+        "active": True,
+        "mode": "full",
+        "inward_direction_xy": tuple(map(float, inward_direction)),
+        "edge_distances_m": edge_distances,
+        "edge_guards_m": edge_guards,
+        "pick_xy_offset_m": tuple(map(float, offset)),
+        "pick_target_table_xy": tuple(map(float, target)),
+        "pregrasp_table_xy": tuple(map(float, pregrasp)),
+        "approach_distance_m": approach_distance,
+    }
 
 
 def _refine_overhead_after_wrist_alignment(env, result, matrix):
@@ -720,12 +825,11 @@ def reacquire_and_pick(
         matrix=matrix,
         overhead_only=recovery_overhead_only,
     )
+    applied_recovery_config_index = None
     if recovery_config_index is not None:
-        configs = {
-            "UPRIGHT": UPRIGHT_RECOVERY_PICK_CONFIGS,
-            "TIPPED": TIPPED_RECOVERY_PICK_CONFIGS,
-        }.get(report["overhead_pose_class"], RECOVERY_PICK_CONFIGS)
-        config = configs[min(int(recovery_config_index), len(configs) - 1)]
+        config, applied_recovery_config_index, _ = select_recovery_pick_config(
+            report["overhead_pose_class"], recovery_config_index
+        )
         pick_xy_offset, pick_center_z, pick_wrist_roll = config
     report.update(
         {
@@ -740,6 +844,12 @@ def reacquire_and_pick(
             "final_wrist_block_visible": False,
             "ready_for_transport": False,
             "overhead_pick_fallback": False,
+            "recovery_config_cursor": (
+                int(recovery_config_index)
+                if recovery_config_index is not None
+                else None
+            ),
+            "recovery_config_index": applied_recovery_config_index,
         }
     )
     if not report["ready_for_pick"]:
@@ -769,33 +879,32 @@ def reacquire_and_pick(
     )
     report["pick_wrist_roll_rad"] = effective_wrist_roll
 
-    inward_direction, edge_distances = boundary_inward_direction(
-        report["estimated_table_xy"]
+    boundary_plan = boundary_safe_pick_plan(
+        report["estimated_table_xy"],
+        pick_xy_offset,
     )
-    boundary_guard_active = (
-        inward_direction is not None and recovery_config_index is not None
+    boundary_guard_active = bool(
+        boundary_plan["active"] and recovery_config_index is not None
     )
-    boundary_approach_distance_m = 0.06
     if boundary_guard_active:
-        offset = np.asarray(pick_xy_offset, dtype=float)
-        # Central-block recovery offsets can accidentally point toward an
-        # edge. Remove that outward component but retain tangential/inward
-        # correction before entering from the boundary side.
-        inward_component = float(np.dot(offset, inward_direction))
-        if inward_component < 0.0:
-            offset = offset - inward_component * inward_direction
-        pick_xy_offset = tuple(map(float, offset))
-        nearest_edge_distance = max(0.0, min(edge_distances.values()))
-        boundary_approach_distance_m = float(
-            np.clip(nearest_edge_distance + 0.015, 0.015, 0.04)
-        )
+        pick_xy_offset = boundary_plan["pick_xy_offset_m"]
+    boundary_approach_distance_m = (
+        boundary_plan["approach_distance_m"] if boundary_guard_active else 0.06
+    )
+    inward_direction = (
+        np.asarray(boundary_plan["inward_direction_xy"], dtype=float)
+        if boundary_guard_active
+        else None
+    )
     report.update(
         {
             "boundary_guard_active": bool(boundary_guard_active),
+            "boundary_guard_mode": boundary_plan["mode"],
             "boundary_edge_distances_m": {
                 name: float(distance)
-                for name, distance in edge_distances.items()
+                for name, distance in boundary_plan["edge_distances_m"].items()
             },
+            "boundary_edge_guards_m": dict(boundary_plan["edge_guards_m"]),
             "boundary_inward_direction_xy": (
                 tuple(map(float, inward_direction))
                 if boundary_guard_active
@@ -803,6 +912,16 @@ def reacquire_and_pick(
             ),
             "pick_xy_offset_m": tuple(map(float, pick_xy_offset)),
             "pick_approach_distance_m": boundary_approach_distance_m,
+            "pick_target_table_xy": (
+                boundary_plan["pick_target_table_xy"]
+                if boundary_guard_active
+                else None
+            ),
+            "pregrasp_table_xy": (
+                boundary_plan["pregrasp_table_xy"]
+                if boundary_guard_active
+                else None
+            ),
         }
     )
 
@@ -880,6 +999,8 @@ def pick_until_verified(
     matrix=SIM_OVERHEAD_PIXEL_TO_TABLE,
     max_attempts=6,
     recovery=False,
+    recovery_start_index=0,
+    on_recovery_attempt_start=None,
 ):
     """Repeat SEARCH/ALIGN/PICK until camera verification or a safety stop."""
     if frames is None:
@@ -901,6 +1022,13 @@ def pick_until_verified(
     for attempt_index, (offset, center_z, wrist_roll) in enumerate(
         configs[:max_attempts], start=1
     ):
+        recovery_config_cursor = (
+            int(recovery_start_index) + attempt_index - 1
+            if recovery
+            else None
+        )
+        if recovery and on_recovery_attempt_start is not None:
+            on_recovery_attempt_start(recovery_config_cursor)
         report = reacquire_and_pick(
             env,
             frames=frames,
@@ -910,7 +1038,7 @@ def pick_until_verified(
             pick_wrist_roll=wrist_roll,
             allow_overhead_pick_fallback=recovery,
             recovery_overhead_only=recovery,
-            recovery_config_index=(attempt_index - 1) if recovery else None,
+            recovery_config_index=recovery_config_cursor,
         )
         report["pick_attempt"] = attempt_index
         attempts.append(report)

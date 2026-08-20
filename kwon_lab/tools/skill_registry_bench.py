@@ -12,9 +12,15 @@ import mujoco
 import numpy as np
 
 from envs.so101_pick_env import BLOCK_HALF_H, SO101PickEnv
-from skills.block_reacquisition import boundary_inward_direction
+from skills.block_reacquisition import (
+    boundary_inward_direction,
+    boundary_safe_pick_plan,
+    select_recovery_pick_config,
+)
 from skills.pick_place_catalog import PickPlaceRuntime, run_registered_pick_place
 from skills.pick_place_state_machine import (
+    PLACE_ALIGN_TOTAL_LIMIT_M,
+    limit_place_alignment_target,
     oriented_rectangle_polygon,
     polygon_intersection_coverage,
     projected_polygon_coverage,
@@ -146,6 +152,20 @@ def run_contract_checks():
     inward_left, _ = boundary_inward_direction((0.105, 0.0))
     inward_corner, _ = boundary_inward_direction((0.105, -0.155))
     inward_center, _ = boundary_inward_direction((0.21, 0.04))
+    top_edge_plan = boundary_safe_pick_plan((0.19, 0.209), (0.0, 0.01))
+    corner_plan = boundary_safe_pick_plan((0.105, -0.155), (-0.01, -0.01))
+    tipped_x_plan = boundary_safe_pick_plan(
+        (0.284, 0.10), (-0.01, 0.01)
+    )
+    tipped_config_0, tipped_index_0, tipped_count = (
+        select_recovery_pick_config("TIPPED", 0)
+    )
+    tipped_config_1, tipped_index_1, _ = select_recovery_pick_config(
+        "TIPPED", 1
+    )
+    tipped_config_wrapped, tipped_index_wrapped, _ = (
+        select_recovery_pick_config("TIPPED", tipped_count)
+    )
 
     block_mask = np.zeros((80, 80), dtype=bool)
     target_mask = np.zeros_like(block_mask)
@@ -159,6 +179,16 @@ def run_contract_checks():
     target_mask[50:70, 50:70] = True
     zero_coverage, _ = projected_polygon_coverage(
         block_mask, target_mask, identity, identity
+    )
+    limited_target, was_limited = limit_place_alignment_target(
+        (0.15, 0.18),
+        (0.15, 0.18),
+        (0.06, -0.04),
+    )
+    unlimited_target, was_unlimited = limit_place_alignment_target(
+        (0.15, 0.18),
+        (0.15, 0.18),
+        (0.005, -0.004),
     )
     target_circle = np.asarray(
         [
@@ -202,12 +232,39 @@ def run_contract_checks():
             and inward_corner[1] > 0.0
             and inward_center is None
         ),
+        "boundary_plan_stays_inside": (
+            top_edge_plan["active"]
+            and top_edge_plan["pick_target_table_xy"][1] < 0.209
+            and top_edge_plan["pregrasp_table_xy"][1] <= 0.2350001
+            and corner_plan["pick_target_table_xy"][0] >= 0.11
+            and corner_plan["pick_target_table_xy"][1] >= -0.15
+            and corner_plan["pregrasp_table_xy"][0] >= 0.10
+            and corner_plan["pregrasp_table_xy"][1] >= -0.16
+            and tipped_x_plan["active"]
+            and tipped_x_plan["mode"] == "full"
+            and tipped_x_plan["pick_target_table_xy"][0] < 0.284
+            and tipped_x_plan["pregrasp_table_xy"][0] <= 0.3150001
+        ),
+        "recovery_config_cursor_advances_and_wraps": (
+            tipped_index_0 == 0
+            and tipped_index_1 == 1
+            and tipped_config_0 != tipped_config_1
+            and tipped_index_wrapped == 0
+            and tipped_config_wrapped == tipped_config_0
+        ),
         "projected_polygon_coverage": (
             full_coverage > 0.99 and zero_coverage == 0.0
         ),
         "physical_footprint_is_not_visible_patch": (
             centered_physical_coverage > 0.99
             and edge_physical_coverage < 0.75
+        ),
+        "place_alignment_total_limit": (
+            was_limited
+            and np.linalg.norm(limited_target - np.array([0.15, 0.18]))
+            <= PLACE_ALIGN_TOTAL_LIMIT_M + 1e-9
+            and not was_unlimited
+            and np.allclose(unlimited_target, (0.155, 0.176))
         ),
     }
     if not all(checks.values()):

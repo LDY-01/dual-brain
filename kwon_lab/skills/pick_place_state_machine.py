@@ -46,6 +46,7 @@ TRANSPORT_DURATION_S = 2.0
 PLACE_ALIGN_TOLERANCE_PX = 10.0
 PLACE_ALIGN_MAX_STEP_M = 0.025
 PLACE_ALIGN_MAX_ITERATIONS = 4
+PLACE_ALIGN_TOTAL_LIMIT_M = 0.02
 PLACE_SETTLE_DURATION_S = 1.2
 PLACE_CLEAR_POSITION = (0.30, 0.0, 0.20)
 PLACE_FINAL_CONFIRM_FRAMES = 10
@@ -80,6 +81,27 @@ def _red_centroid(frame):
         return None
     ys, xs = np.nonzero(red)
     return np.array([float(xs.mean()), float(ys.mean())], dtype=float)
+
+
+def limit_place_alignment_target(
+    anchor_xy,
+    current_xy,
+    delta_xy,
+    total_limit_m=PLACE_ALIGN_TOTAL_LIMIT_M,
+):
+    """Clamp one visual-servo target around the validated transport anchor."""
+    anchor = np.asarray(anchor_xy, dtype=float)
+    proposed = np.asarray(current_xy, dtype=float) + np.asarray(
+        delta_xy, dtype=float
+    )
+    anchor_delta = proposed - anchor
+    distance = float(np.linalg.norm(anchor_delta))
+    if distance <= float(total_limit_m) or distance <= 1e-12:
+        return proposed, False
+    return (
+        anchor + anchor_delta * (float(total_limit_m) / distance),
+        True,
+    )
 
 
 def project_mask_polygon(mask, matrix, min_pixels=100):
@@ -290,6 +312,9 @@ def place_verified_transport(
         "alignment_iterations": 0,
         "alignment_errors_px": [],
         "alignment_skipped_reason": None,
+        "alignment_total_correction_m": 0.0,
+        "alignment_total_limit_m": PLACE_ALIGN_TOTAL_LIMIT_M,
+        "alignment_limited": False,
         "place_steps": 0,
         "drop_detected": False,
         "drop_detected_step": None,
@@ -469,6 +494,7 @@ def place_verified_transport(
         return confirmed
 
     try:
+        place_anchor_xy = _end_effector_position(env)[:2].copy()
         # First descend vertically to the safe place approach height.
         ee = _end_effector_position(env)
         move_to(
@@ -511,17 +537,34 @@ def place_verified_transport(
             if delta_norm > max_step:
                 delta_xy *= max_step / delta_norm
             ee = _end_effector_position(env)
+            proposed_xy, alignment_limited = limit_place_alignment_target(
+                place_anchor_xy,
+                ee[:2],
+                delta_xy,
+            )
+            report["alignment_limited"] = bool(
+                report["alignment_limited"] or alignment_limited
+            )
+            applied_delta = proposed_xy - ee[:2]
+            if float(np.linalg.norm(applied_delta)) < 0.001:
+                report["alignment_skipped_reason"] = (
+                    "total_correction_limit_reached"
+                )
+                break
             move_to(
                 env,
                 [
-                    ee[0] + float(delta_xy[0]),
-                    ee[1] + float(delta_xy[1]),
+                    float(proposed_xy[0]),
+                    float(proposed_xy[1]),
                     PLACE_RELEASE_HEIGHT,
                 ],
                 duration=0.7 if conservative else 0.45,
                 on_observation=supervise_motion,
             )
             report["alignment_iterations"] += 1
+            report["alignment_total_correction_m"] = float(
+                np.linalg.norm(proposed_xy - place_anchor_xy)
+            )
     except _TransportDropDetected as event:
         report["drop_detected"] = True
         report["drop_detected_step"] = event.step

@@ -111,19 +111,84 @@ def run_episode(mode, seed):
                 "inward_direction_xy": report.get(
                     "boundary_inward_direction_xy"
                 ),
+                "mode": report.get("boundary_guard_mode"),
+                "edge_guards_m": report.get("boundary_edge_guards_m"),
                 "approach_distance_m": report.get(
                     "pick_approach_distance_m"
                 ),
                 "pick_xy_offset_m": report.get("pick_xy_offset_m"),
+                "pick_target_table_xy": report.get("pick_target_table_xy"),
+                "pregrasp_table_xy": report.get("pregrasp_table_xy"),
+                "recovery_config_cursor": report.get(
+                    "recovery_config_cursor"
+                ),
+                "recovery_config_index": report.get(
+                    "recovery_config_index"
+                ),
                 "failure_reason": report.get("failure_reason"),
             }
             for report in attempt_reports
             if report.get("boundary_guard_active")
         ]
+        pick_attempt_diagnostics = [
+            {
+                "pick_attempt": report.get("pick_attempt"),
+                "recovery_config_cursor": report.get(
+                    "recovery_config_cursor"
+                ),
+                "recovery_config_index": report.get(
+                    "recovery_config_index"
+                ),
+                "pose_class": report.get("overhead_pose_class"),
+                "orientation_rad": report.get("overhead_orientation_rad"),
+                "estimated_table_xy": report.get("estimated_table_xy"),
+                "pick_xy_offset_m": report.get("pick_xy_offset_m"),
+                "boundary_guard_active": report.get(
+                    "boundary_guard_active"
+                ),
+                "boundary_guard_mode": report.get("boundary_guard_mode"),
+                "ready_for_pick": report.get("ready_for_pick"),
+                "pick_attempted": report.get("pick_attempted"),
+                "camera_grasp_confirmed": report.get(
+                    "camera_grasp_confirmed"
+                ),
+                "failure_reason": report.get("failure_reason"),
+            }
+            for report in attempt_reports
+        ]
         place_reports = [
             execution.get("result") or {}
             for execution in flattened
             if execution["skill"] == "place_6cm"
+        ]
+        place_attempt_diagnostics = [
+            {
+                "status": execution.get("status"),
+                "failure_reason": execution.get("failure_reason"),
+                "elapsed_s": execution.get("elapsed_s"),
+                "alignment_iterations": report.get("alignment_iterations"),
+                "alignment_errors_px": report.get("alignment_errors_px"),
+                "alignment_total_correction_m": report.get(
+                    "alignment_total_correction_m"
+                ),
+                "alignment_total_limit_m": report.get(
+                    "alignment_total_limit_m"
+                ),
+                "alignment_limited": report.get("alignment_limited"),
+                "alignment_skipped_reason": report.get(
+                    "alignment_skipped_reason"
+                ),
+                "drop_detected": report.get("drop_detected"),
+                "projected_target_coverage": report.get(
+                    "projected_target_coverage"
+                ),
+                "camera_place_confirmed": report.get(
+                    "camera_place_confirmed"
+                ),
+            }
+            for execution in flattened
+            if execution["skill"] == "place_6cm"
+            for report in [execution.get("result") or {}]
         ]
         final_place_report = place_reports[-1] if place_reports else {}
         failure_reasons = [
@@ -155,6 +220,8 @@ def run_episode(mode, seed):
             "pick_attempts": int(pick_attempts),
             "boundary_guard_activations": int(boundary_guard_activations),
             "boundary_guard_events": boundary_guard_events,
+            "pick_attempt_diagnostics": pick_attempt_diagnostics,
+            "place_attempt_diagnostics": place_attempt_diagnostics,
             "cycles_attempted": int(result.get("cycles_attempted", 0)),
             "recovery_used": bool(recovery_used),
             "recovery_attempted": bool(recovery_skills),

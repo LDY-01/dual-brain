@@ -113,13 +113,24 @@ def _observe_effects(context, result, _succeeded):
 
 def _pick(context, params, *, recovery=False):
     runtime = context.runtime
-    if recovery and _state(context, "holding"):
+    effective_recovery = bool(
+        recovery or context.state.get("needs_recovery_pick", False)
+    )
+    if effective_recovery and _state(context, "holding"):
         return {
             "success": True,
             "already_holding": True,
             "attempts": 0,
             "failure_reason": None,
         }
+
+    recovery_start_index = int(
+        context.state.get("recovery_attempt_cursor", 0)
+    )
+
+    def advance_recovery_cursor(config_cursor):
+        context.state["recovery_attempt_cursor"] = int(config_cursor) + 1
+
     with _cooperative_env_deadline(context):
         result = pick_until_verified(
             runtime.env,
@@ -128,18 +139,31 @@ def _pick(context, params, *, recovery=False):
             max_attempts=int(
                 params.get("max_pick_attempts", runtime.max_pick_attempts)
             ),
-            recovery=recovery,
+            recovery=effective_recovery,
+            recovery_start_index=recovery_start_index,
+            on_recovery_attempt_start=(
+                advance_recovery_cursor if effective_recovery else None
+            ),
         )
-    result["recovery_pick"] = bool(recovery)
+    result["recovery_pick"] = effective_recovery
+    result["recovery_requested_by_skill"] = bool(recovery)
+    result["recovery_start_index"] = (
+        recovery_start_index if effective_recovery else None
+    )
+    result["recovery_next_index"] = int(
+        context.state.get("recovery_attempt_cursor", 0)
+    )
     return result
 
 
 def _pick_effects(context, result, _succeeded):
-    context.state["holding"] = bool(result and result.get("success"))
+    picked = bool(result and result.get("success"))
+    context.state["holding"] = picked
     context.state["at_target"] = False
     context.state["recovery_grasp"] = bool(
-        result and result.get("success") and result.get("recovery_pick")
+        result and picked and result.get("recovery_pick")
     )
+    context.state["needs_recovery_pick"] = not picked
 
 
 def _transport(context, params):
@@ -294,6 +318,8 @@ def run_registered_pick_place(
             "at_target": False,
             "task_done": False,
             "recovery_grasp": False,
+            "needs_recovery_pick": False,
+            "recovery_attempt_cursor": 0,
         },
         audit_path=Path(audit_path) if audit_path else None,
         skill_stages={
@@ -335,6 +361,7 @@ def run_registered_pick_place(
             # bounded cycle must visually reacquire before moving again.
             context.state["holding"] = False
             context.state["at_target"] = False
+            context.state["needs_recovery_pick"] = True
     return {
         "success": bool(context.state["task_done"]),
         "final_state": dict(context.state),
