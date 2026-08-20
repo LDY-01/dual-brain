@@ -9,9 +9,16 @@ import time
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import mujoco
+import numpy as np
 
 from envs.so101_pick_env import BLOCK_HALF_H, SO101PickEnv
+from skills.block_reacquisition import boundary_inward_direction
 from skills.pick_place_catalog import PickPlaceRuntime, run_registered_pick_place
+from skills.pick_place_state_machine import (
+    oriented_rectangle_polygon,
+    polygon_intersection_coverage,
+    projected_polygon_coverage,
+)
 from skills.registry import (
     Precondition,
     SkillContext,
@@ -106,6 +113,75 @@ def run_contract_checks():
         bounded_registry,
         SkillContext(runtime=None, clock=fake_clock),
     ).execute("bounded")
+
+    stage_time = [0.0]
+
+    def stage_clock():
+        return stage_time[0]
+
+    def stage_work(context, _params):
+        stage_time[0] += 0.6
+        context.check_deadline()
+        return {"success": True}
+
+    stage_registry = SkillRegistry()
+    stage_registry.register(
+        SkillSpec(
+            "retry",
+            stage_work,
+            lambda _context, result: result["success"],
+            timeout_s=2.0,
+        )
+    )
+    stage_context = SkillContext(
+        runtime=None,
+        clock=stage_clock,
+        skill_stages={"retry": "pick"},
+        stage_budget_remaining_s={"pick": 1.0},
+    )
+    stage_executor = SkillExecutor(stage_registry, stage_context)
+    first_stage_run = stage_executor.execute("retry")
+    second_stage_run = stage_executor.execute("retry")
+
+    inward_left, _ = boundary_inward_direction((0.105, 0.0))
+    inward_corner, _ = boundary_inward_direction((0.105, -0.155))
+    inward_center, _ = boundary_inward_direction((0.21, 0.04))
+
+    block_mask = np.zeros((80, 80), dtype=bool)
+    target_mask = np.zeros_like(block_mask)
+    block_mask[20:40, 20:40] = True
+    target_mask[20:40, 20:40] = True
+    identity = np.array([[0.001, 0.0, 0.0], [0.0, 0.001, 0.0]])
+    full_coverage, _ = projected_polygon_coverage(
+        block_mask, target_mask, identity, identity
+    )
+    target_mask[:] = False
+    target_mask[50:70, 50:70] = True
+    zero_coverage, _ = projected_polygon_coverage(
+        block_mask, target_mask, identity, identity
+    )
+    target_circle = np.asarray(
+        [
+            [
+                0.15 + 0.05 * np.cos(angle),
+                0.18 + 0.05 * np.sin(angle),
+            ]
+            for angle in np.linspace(0.0, 2.0 * np.pi, 72, endpoint=False)
+        ],
+        dtype=np.float32,
+    )
+    centered_footprint = oriented_rectangle_polygon(
+        (0.15, 0.18), 0.0, 0.04, 0.04
+    )
+    edge_footprint = oriented_rectangle_polygon(
+        (0.205, 0.175), 0.0, 0.06, 0.04
+    )
+    centered_physical_coverage, _ = polygon_intersection_coverage(
+        centered_footprint, target_circle
+    )
+    edge_physical_coverage, _ = polygon_intersection_coverage(
+        edge_footprint, target_circle
+    )
     checks = {
         "precondition_blocked": blocked.status == "blocked",
         "recovery_completed": recovered.status == "recovered",
@@ -114,6 +190,24 @@ def run_contract_checks():
         "timeout_rejected": timed_out.status == "timed_out",
         "cooperative_timeout_interrupted": (
             bounded.status == "timed_out" and cooperative_steps[0] == 3
+        ),
+        "stage_budget_is_cumulative": (
+            first_stage_run.success
+            and second_stage_run.status == "timed_out"
+            and stage_context.stage_budget_remaining_s["pick"] == 0.0
+        ),
+        "boundary_direction_is_inward": (
+            np.allclose(inward_left, [1.0, 0.0])
+            and inward_corner[0] > 0.0
+            and inward_corner[1] > 0.0
+            and inward_center is None
+        ),
+        "projected_polygon_coverage": (
+            full_coverage > 0.99 and zero_coverage == 0.0
+        ),
+        "physical_footprint_is_not_visible_patch": (
+            centered_physical_coverage > 0.99
+            and edge_physical_coverage < 0.75
         ),
     }
     if not all(checks.values()):

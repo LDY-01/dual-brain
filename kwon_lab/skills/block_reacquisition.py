@@ -53,9 +53,27 @@ SIM_OVERHEAD_TARGET_PIXEL_TO_TABLE = np.array(
     ],
     dtype=float,
 )
+_SIM_OVERHEAD_IMAGE_CENTER_PX = np.array([640.0, 360.0])
+_SIM_OVERHEAD_LENS_HEIGHT_M = 0.52
+_tipped_scale = (_SIM_OVERHEAD_LENS_HEIGHT_M - 0.04) / _SIM_OVERHEAD_LENS_HEIGHT_M
+_tipped_linear = _tipped_scale * SIM_OVERHEAD_TARGET_PIXEL_TO_TABLE[:, :2]
+_tipped_center_xy = SIM_OVERHEAD_TARGET_PIXEL_TO_TABLE @ np.array(
+    [*_SIM_OVERHEAD_IMAGE_CENTER_PX, 1.0]
+)
+SIM_OVERHEAD_TIPPED_PIXEL_TO_TABLE = np.column_stack(
+    [
+        _tipped_linear,
+        _tipped_center_xy - _tipped_linear @ _SIM_OVERHEAD_IMAGE_CENTER_PX,
+    ]
+)
+SIM_OVERHEAD_BLOCK_PIXEL_TO_TABLE = {
+    "UPRIGHT": SIM_OVERHEAD_PIXEL_TO_TABLE,
+    "TIPPED": SIM_OVERHEAD_TIPPED_PIXEL_TO_TABLE,
+}
 
 WORKSPACE_X = (0.10, 0.32)
 WORKSPACE_Y = (-0.16, 0.24)
+WORKSPACE_EDGE_GUARD_M = 0.04
 MAX_COARSE_IK_ERROR_M = 0.015
 APPROACH_CONFIGS = (
     (0.16, 30),
@@ -157,7 +175,7 @@ class OverheadTargetLocation:
     pixels: int
 
 
-def _select_foreground_component(mask, min_pixels):
+def select_foreground_component(mask, min_pixels):
     """Prefer the largest non-border color component over unrelated clutter."""
     binary = np.asarray(mask, dtype=np.uint8)
     count, labels, stats, _ = cv2.connectedComponentsWithStats(binary, 8)
@@ -220,7 +238,7 @@ def load_real_camera_matrices(config_path):
     return block_matrices, target_matrix
 
 
-def _matrix_for_block_pose(matrix, pose_class):
+def matrix_for_block_pose(matrix, pose_class):
     if isinstance(matrix, dict):
         selected = matrix.get(pose_class)
         if selected is None:
@@ -236,7 +254,7 @@ def _matrix_for_block_pose(matrix, pose_class):
 def locate_overhead_block(frame, matrix=SIM_OVERHEAD_PIXEL_TO_TABLE):
     """Locate the red block and reject estimates outside the robot workspace."""
     red_mask, _ = color_masks(frame)
-    red_mask, pixels, touches_border = _select_foreground_component(
+    red_mask, pixels, touches_border = select_foreground_component(
         red_mask, OVERHEAD_REACQUIRE_MIN_PIXELS
     )
     if pixels < OVERHEAD_REACQUIRE_MIN_PIXELS:
@@ -291,7 +309,7 @@ def locate_overhead_block(frame, matrix=SIM_OVERHEAD_PIXEL_TO_TABLE):
                     1.0,
                 )
             )
-    pose_matrix = _matrix_for_block_pose(matrix, pose_class)
+    pose_matrix = matrix_for_block_pose(matrix, pose_class)
     xy = pixel_to_table(centroid, pose_matrix)
     axis_pixel = np.asarray(centroid) + 10.0 * pixel_axis
     axis_xy = np.asarray(pixel_to_table(axis_pixel, pose_matrix))
@@ -434,7 +452,7 @@ def locate_overhead_target(
 ):
     """Locate the green placement zone from the fixed overhead camera."""
     _, green_mask = color_masks(frame)
-    green_mask, pixels, _ = _select_foreground_component(
+    green_mask, pixels, _ = select_foreground_component(
         green_mask, OVERHEAD_REACQUIRE_MIN_PIXELS
     )
     if pixels < OVERHEAD_REACQUIRE_MIN_PIXELS:
@@ -447,6 +465,48 @@ def locate_overhead_target(
         pixel_to_table(centroid, matrix),
         pixels,
     )
+
+
+def boundary_inward_direction(
+    table_xy,
+    edge_guard_m=WORKSPACE_EDGE_GUARD_M,
+):
+    """Return a unit direction from the nearest workspace edge(s) inward.
+
+    ``None`` means the point is not inside the configured edge guard. At a
+    corner both inward normals are blended, so the pre-grasp path cannot push
+    the block across either adjacent boundary.
+    """
+    x, y = map(float, table_xy)
+    distances = {
+        "x_min": x - WORKSPACE_X[0],
+        "x_max": WORKSPACE_X[1] - x,
+        "y_min": y - WORKSPACE_Y[0],
+        "y_max": WORKSPACE_Y[1] - y,
+    }
+    if min(distances.values()) < 0.0:
+        return None, distances
+    normals = {
+        "x_min": np.array([1.0, 0.0]),
+        "x_max": np.array([-1.0, 0.0]),
+        "y_min": np.array([0.0, 1.0]),
+        "y_max": np.array([0.0, -1.0]),
+    }
+    active = [
+        name
+        for name, distance in distances.items()
+        if distance <= float(edge_guard_m)
+    ]
+    if not active:
+        return None, distances
+    direction = sum(
+        normals[name] / max(distances[name], 0.005)
+        for name in active
+    )
+    norm = float(np.linalg.norm(direction))
+    if norm < 1e-9:
+        return None, distances
+    return direction / norm, distances
 
 
 def _refine_overhead_after_wrist_alignment(env, result, matrix):
@@ -709,6 +769,43 @@ def reacquire_and_pick(
     )
     report["pick_wrist_roll_rad"] = effective_wrist_roll
 
+    inward_direction, edge_distances = boundary_inward_direction(
+        report["estimated_table_xy"]
+    )
+    boundary_guard_active = (
+        inward_direction is not None and recovery_config_index is not None
+    )
+    boundary_approach_distance_m = 0.06
+    if boundary_guard_active:
+        offset = np.asarray(pick_xy_offset, dtype=float)
+        # Central-block recovery offsets can accidentally point toward an
+        # edge. Remove that outward component but retain tangential/inward
+        # correction before entering from the boundary side.
+        inward_component = float(np.dot(offset, inward_direction))
+        if inward_component < 0.0:
+            offset = offset - inward_component * inward_direction
+        pick_xy_offset = tuple(map(float, offset))
+        nearest_edge_distance = max(0.0, min(edge_distances.values()))
+        boundary_approach_distance_m = float(
+            np.clip(nearest_edge_distance + 0.015, 0.015, 0.04)
+        )
+    report.update(
+        {
+            "boundary_guard_active": bool(boundary_guard_active),
+            "boundary_edge_distances_m": {
+                name: float(distance)
+                for name, distance in edge_distances.items()
+            },
+            "boundary_inward_direction_xy": (
+                tuple(map(float, inward_direction))
+                if boundary_guard_active
+                else None
+            ),
+            "pick_xy_offset_m": tuple(map(float, pick_xy_offset)),
+            "pick_approach_distance_m": boundary_approach_distance_m,
+        }
+    )
+
     monitor = VisionPickMonitor()
     observed_steps = 0
 
@@ -735,6 +832,11 @@ def reacquire_and_pick(
         [x, y, float(pick_center_z)],
         frames=frames,
         on_lift_observation=observe_lift,
+        approach_direction_xy=(
+            inward_direction if boundary_guard_active else None
+        ),
+        approach_distance_m=boundary_approach_distance_m,
+        approach_duration_s=1.1 if boundary_guard_active else 0.9,
     )
     if recovery_config_index is not None:
         # Recovered blocks are often tipped and sit less deeply in the jaws.

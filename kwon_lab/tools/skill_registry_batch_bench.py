@@ -18,6 +18,12 @@ import numpy as np
 from envs.so101_pick_env import SO101PickEnv
 from skills.block_reacquisition import locate_overhead_block
 from skills.pick_place_catalog import PickPlaceRuntime, run_registered_pick_place
+from skills.pick_place_state_machine import (
+    BLOCK_FOOTPRINT_DIMENSIONS_M,
+    PLACE_PROJECTED_SAFETY_MARGIN,
+    PLACE_PROJECTED_SUCCESS_COVERAGE,
+    PLACE_TASK_SUCCESS_COVERAGE,
+)
 from tools.skill_registry_bench import inject_slip
 
 
@@ -87,6 +93,39 @@ def run_episode(mode, seed):
             for execution in flattened
             if execution["skill"] in {"pick", "recover_pick"}
         )
+        attempt_reports = [
+            report
+            for execution in flattened
+            if execution["skill"] in {"pick", "recover_pick"}
+            for report in (execution.get("result") or {}).get(
+                "attempt_reports", []
+            )
+        ]
+        boundary_guard_activations = sum(
+            bool(report.get("boundary_guard_active"))
+            for report in attempt_reports
+        )
+        boundary_guard_events = [
+            {
+                "estimated_table_xy": report.get("estimated_table_xy"),
+                "inward_direction_xy": report.get(
+                    "boundary_inward_direction_xy"
+                ),
+                "approach_distance_m": report.get(
+                    "pick_approach_distance_m"
+                ),
+                "pick_xy_offset_m": report.get("pick_xy_offset_m"),
+                "failure_reason": report.get("failure_reason"),
+            }
+            for report in attempt_reports
+            if report.get("boundary_guard_active")
+        ]
+        place_reports = [
+            execution.get("result") or {}
+            for execution in flattened
+            if execution["skill"] == "place_6cm"
+        ]
+        final_place_report = place_reports[-1] if place_reports else {}
         failure_reasons = [
             execution["failure_reason"]
             for execution in flattened
@@ -114,13 +153,17 @@ def run_episode(mode, seed):
             "final_overhead_visible": bool(location.visible),
             "final_block_reachable": bool(location.reachable),
             "pick_attempts": int(pick_attempts),
+            "boundary_guard_activations": int(boundary_guard_activations),
+            "boundary_guard_events": boundary_guard_events,
             "cycles_attempted": int(result.get("cycles_attempted", 0)),
             "recovery_used": bool(recovery_used),
             "recovery_attempted": bool(recovery_skills),
             "recovery_skills": recovery_skills,
             "fault_requested": mode == "forced_place_drop",
             "fault_injected": bool(injected),
-            "fault_recovered": bool(injected and result["success"]),
+            "fault_recovered": bool(
+                injected and result["success"] and info["success"]
+            ),
             "terminal_skill": terminal["skill"],
             "terminal_status": terminal["status"],
             "terminal_failure_reason": (
@@ -130,6 +173,28 @@ def run_episode(mode, seed):
                 None if result["success"] else terminal.get("failure_reason")
             ),
             "observed_failure_reasons": failure_reasons,
+            "final_success_coverage_method": final_place_report.get(
+                "success_coverage_method"
+            ),
+            "final_projected_target_coverage": final_place_report.get(
+                "projected_target_coverage"
+            ),
+            "final_image_target_coverage": final_place_report.get(
+                "image_target_coverage"
+            ),
+            "final_camera_block_pose_class": final_place_report.get(
+                "final_block_pose_class"
+            ),
+            "final_camera_block_pose_confidence": final_place_report.get(
+                "final_block_pose_confidence"
+            ),
+            "final_camera_block_table_xy": final_place_report.get(
+                "final_block_table_xy"
+            ),
+            "stage_budgets_s": result.get("stage_budgets_s"),
+            "stage_budget_remaining_s": result.get(
+                "stage_budget_remaining_s"
+            ),
             "skill_elapsed_s": float(
                 sum(float(execution["elapsed_s"]) for execution in flattened)
             ),
@@ -184,6 +249,15 @@ def summarize_mode(rows):
         ),
         "faults_injected": sum(row.get("fault_injected", False) for row in rows),
         "faults_recovered": sum(row.get("fault_recovered", False) for row in rows),
+        "boundary_guard_activations": sum(
+            int(row.get("boundary_guard_activations", 0)) for row in rows
+        ),
+        "stage_budget_exhaustions": sum(
+            any("stage budget" in str(reason) for reason in row.get(
+                "observed_failure_reasons", []
+            ))
+            for row in rows
+        ),
         "final_block_unreachable": sum(
             not row.get("final_block_reachable", False) for row in rows
         ),
@@ -221,6 +295,15 @@ def write_summary(path, rows, requested):
             "runtime_privileged_object_state": False,
             "truth_used_after_episode_for_scoring_only": True,
             "object_profile": "real_28g",
+            "success_coverage_method": (
+                "physical_footprint_projected_polygon_intersection"
+            ),
+            "task_success_coverage_required": PLACE_TASK_SUCCESS_COVERAGE,
+            "camera_success_coverage_required": (
+                PLACE_PROJECTED_SUCCESS_COVERAGE
+            ),
+            "projection_safety_margin": PLACE_PROJECTED_SAFETY_MARGIN,
+            "block_footprint_dimensions_m": BLOCK_FOOTPRINT_DIMENSIONS_M,
             "normal_seed_range": requested["normal_seed_range"],
             "forced_drop_seed_range": requested["forced_drop_seed_range"],
             "normal_seeds": requested["normal_seeds"],

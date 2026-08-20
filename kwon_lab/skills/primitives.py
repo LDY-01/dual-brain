@@ -193,7 +193,15 @@ POCKET_OFFSET = np.array([-0.03, 0.0, 0.01])  # 실측: 포켓 중심의 site계
 GRASP_PITCH = 50  # 50시드 탐색에서 가장 안정적이었던 접근 각도 (deg)
 
 
-def pick(env, block_pos, frames=None, on_lift_observation=None):
+def pick(
+    env,
+    block_pos,
+    frames=None,
+    on_lift_observation=None,
+    approach_direction_xy=None,
+    approach_distance_m=0.06,
+    approach_duration_s=0.9,
+):
     """블록 위치를 받아 집어 올린다. 성공 여부 반환.
 
     검증된 레시피(2026-08-10): 45도 접근 → 손가락 축 따라 삽입(클로머신) →
@@ -207,7 +215,26 @@ def pick(env, block_pos, frames=None, on_lift_observation=None):
     if frames is not None: frames += f
     R = env.data.site_xmat[sid].reshape(3, 3)
     gf_target = b - R @ POCKET_OFFSET
-    _, _, f = move_to(env, gf_target - R[:, 0] * 0.06, duration=0.9)
+    entry_axis = R[:, 0]
+    if approach_direction_xy is not None:
+        direction = np.asarray(approach_direction_xy, dtype=float)
+        if direction.shape != (2,) or not np.all(np.isfinite(direction)):
+            raise ValueError("approach_direction_xy must be a finite XY vector")
+        norm = float(np.linalg.norm(direction))
+        if norm < 1e-9:
+            raise ValueError("approach_direction_xy must be non-zero")
+        entry_axis = np.array(
+            [direction[0] / norm, direction[1] / norm, 0.0],
+            dtype=float,
+        )
+    approach_distance_m = float(approach_distance_m)
+    if not 0.0 < approach_distance_m <= 0.08:
+        raise ValueError("approach_distance_m must be in (0, 0.08]")
+    _, _, f = move_to(
+        env,
+        gf_target - entry_axis * approach_distance_m,
+        duration=float(approach_duration_s),
+    )
     if frames is not None: frames += f
     _, _, f = move_to(env, gf_target, duration=0.8)
     if frames is not None: frames += f

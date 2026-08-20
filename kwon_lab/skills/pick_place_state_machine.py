@@ -8,13 +8,17 @@ part of this stage yet.
 from dataclasses import dataclass
 from collections import deque
 
+import cv2
 import numpy as np
 
 from skills.block_reacquisition import (
     SIM_OVERHEAD_PIXEL_TO_TABLE,
     SIM_OVERHEAD_TARGET_PIXEL_TO_TABLE,
     locate_overhead_target,
+    locate_overhead_block,
+    pixel_to_table,
     pick_until_verified,
+    select_foreground_component,
 )
 from skills.primitives import (
     EE_SITE,
@@ -45,8 +49,16 @@ PLACE_ALIGN_MAX_ITERATIONS = 4
 PLACE_SETTLE_DURATION_S = 1.2
 PLACE_CLEAR_POSITION = (0.30, 0.0, 0.20)
 PLACE_FINAL_CONFIRM_FRAMES = 10
-PLACE_FINAL_MAX_SPREAD_PX = 3.0
-PLACE_CAMERA_SUCCESS_COVERAGE = 0.78
+PLACE_FINAL_MAX_SPREAD_M = 0.004
+PLACE_TASK_SUCCESS_COVERAGE = 0.75
+PLACE_PROJECTED_SAFETY_MARGIN = 0.01
+PLACE_PROJECTED_SUCCESS_COVERAGE = (
+    PLACE_TASK_SUCCESS_COVERAGE + PLACE_PROJECTED_SAFETY_MARGIN
+)
+BLOCK_FOOTPRINT_DIMENSIONS_M = {
+    "UPRIGHT": (0.04, 0.04),
+    "TIPPED": (0.06, 0.04),
+}
 
 
 @dataclass
@@ -68,6 +80,97 @@ def _red_centroid(frame):
         return None
     ys, xs = np.nonzero(red)
     return np.array([float(xs.mean()), float(ys.mean())], dtype=float)
+
+
+def project_mask_polygon(mask, matrix, min_pixels=100):
+    """Project the largest visible component hull onto the table plane."""
+    component, pixels, _ = select_foreground_component(mask, min_pixels)
+    if pixels < min_pixels:
+        return None
+    contours, _ = cv2.findContours(
+        component.astype(np.uint8),
+        cv2.RETR_EXTERNAL,
+        cv2.CHAIN_APPROX_SIMPLE,
+    )
+    if not contours:
+        return None
+    contour = max(contours, key=cv2.contourArea)
+    hull = cv2.convexHull(contour).reshape(-1, 2)
+    if len(hull) < 3:
+        return None
+    projected = np.asarray(
+        [pixel_to_table(point, matrix) for point in hull],
+        dtype=np.float32,
+    )
+    return projected if len(projected) >= 3 else None
+
+
+def projected_polygon_coverage(
+    block_mask,
+    target_mask,
+    block_matrix,
+    target_matrix,
+):
+    """Return target intersection divided by projected block footprint area."""
+    block_polygon = project_mask_polygon(block_mask, block_matrix)
+    target_polygon = project_mask_polygon(target_mask, target_matrix)
+    if block_polygon is None or target_polygon is None:
+        return 0.0, {
+            "block_polygon_area_m2": 0.0,
+            "target_polygon_area_m2": 0.0,
+            "intersection_area_m2": 0.0,
+        }
+    return polygon_intersection_coverage(block_polygon, target_polygon)
+
+
+def oriented_rectangle_polygon(center_xy, orientation_rad, length_m, width_m):
+    """Build a physical table-footprint rectangle from camera pose evidence."""
+    center = np.asarray(center_xy, dtype=float)
+    major = np.array(
+        [np.cos(orientation_rad), np.sin(orientation_rad)], dtype=float
+    )
+    minor = np.array([-major[1], major[0]], dtype=float)
+    half_major = 0.5 * float(length_m) * major
+    half_minor = 0.5 * float(width_m) * minor
+    return np.asarray(
+        [
+            center - half_major - half_minor,
+            center + half_major - half_minor,
+            center + half_major + half_minor,
+            center - half_major + half_minor,
+        ],
+        dtype=np.float32,
+    )
+
+
+def polygon_intersection_coverage(block_polygon, target_polygon):
+    """Return target intersection divided by the full block footprint area."""
+    if block_polygon is None or target_polygon is None:
+        return 0.0, {
+            "block_polygon_area_m2": 0.0,
+            "target_polygon_area_m2": 0.0,
+            "intersection_area_m2": 0.0,
+        }
+    block_polygon = np.asarray(block_polygon, dtype=np.float32)
+    target_polygon = np.asarray(target_polygon, dtype=np.float32)
+    block_area = float(abs(cv2.contourArea(block_polygon)))
+    target_area = float(abs(cv2.contourArea(target_polygon)))
+    if block_area <= 1e-12 or target_area <= 1e-12:
+        return 0.0, {
+            "block_polygon_area_m2": block_area,
+            "target_polygon_area_m2": target_area,
+            "intersection_area_m2": 0.0,
+        }
+    intersection_area, _ = cv2.intersectConvexConvex(
+        block_polygon,
+        target_polygon,
+    )
+    intersection_area = float(max(0.0, intersection_area))
+    return float(np.clip(intersection_area / block_area, 0.0, 1.0)), {
+        "block_polygon_area_m2": block_area,
+        "target_polygon_area_m2": target_area,
+        "intersection_area_m2": intersection_area,
+    }
 
 
 def transport_verified_pick(
@@ -164,6 +267,7 @@ def place_verified_transport(
     overhead_calibration_frame,
     frames=None,
     target_matrix=SIM_OVERHEAD_TARGET_PIXEL_TO_TABLE,
+    block_matrix=SIM_OVERHEAD_PIXEL_TO_TABLE,
     on_place_step=None,
     conservative=False,
 ):
@@ -191,8 +295,18 @@ def place_verified_transport(
         "drop_detected_step": None,
         "released": False,
         "stable_success_frames_required": PLACE_FINAL_CONFIRM_FRAMES,
-        "camera_success_coverage_required": PLACE_CAMERA_SUCCESS_COVERAGE,
+        "camera_success_coverage_required": PLACE_PROJECTED_SUCCESS_COVERAGE,
+        "task_success_coverage_required": PLACE_TASK_SUCCESS_COVERAGE,
+        "projection_safety_margin": PLACE_PROJECTED_SAFETY_MARGIN,
+        "success_coverage_method": (
+            "physical_footprint_projected_polygon_intersection"
+        ),
         "image_target_coverage": 0.0,
+        "projected_target_coverage": 0.0,
+        "projected_geometry": None,
+        "final_block_pose_class": None,
+        "final_block_pose_confidence": 0.0,
+        "final_block_table_xy": None,
         "table_area_ratio": 0.0,
         "place_evidence_frames": 0,
         "camera_place_confirmed": False,
@@ -245,23 +359,63 @@ def place_verified_transport(
         report["place_steps"] = step
         report["table_area_ratio"] = float(signals["table_area_ratio"])
         red, _ = color_masks(overhead_frame)
-        red_area = int(red.sum())
+        red_component, red_area, _ = select_foreground_component(red, 100)
         if red_area >= 100:
-            ys, xs = np.nonzero(red)
-            centroid = np.array([float(xs.mean()), float(ys.mean())])
-            coverage = float(
-                np.count_nonzero(red & place_monitor.target_mask) / red_area
+            image_coverage = float(
+                np.count_nonzero(red_component & place_monitor.target_mask)
+                / red_area
             )
+            location = locate_overhead_block(overhead_frame, block_matrix)
+            centroid = (
+                np.asarray(location.table_xy, dtype=float)
+                if location.table_xy is not None
+                else None
+            )
+            footprint_dimensions = BLOCK_FOOTPRINT_DIMENSIONS_M.get(
+                location.pose_class
+            )
+            if (
+                centroid is not None
+                and location.orientation_rad is not None
+                and footprint_dimensions is not None
+            ):
+                block_polygon = oriented_rectangle_polygon(
+                    centroid,
+                    location.orientation_rad,
+                    *footprint_dimensions,
+                )
+                target_polygon = project_mask_polygon(
+                    place_monitor.target_mask, target_matrix
+                )
+                coverage, geometry = polygon_intersection_coverage(
+                    block_polygon, target_polygon
+                )
+            else:
+                coverage, geometry = polygon_intersection_coverage(None, None)
+            report["final_block_pose_class"] = location.pose_class
+            report["final_block_pose_confidence"] = float(
+                location.pose_confidence
+            )
+            report["final_block_table_xy"] = location.table_xy
         else:
             centroid = None
             coverage = 0.0
+            image_coverage = 0.0
+            geometry = {
+                "block_polygon_area_m2": 0.0,
+                "target_polygon_area_m2": 0.0,
+                "intersection_area_m2": 0.0,
+            }
+            report["final_block_pose_class"] = None
+            report["final_block_pose_confidence"] = 0.0
+            report["final_block_table_xy"] = None
         final_history.append((centroid, coverage))
         stable = False
         if (
             len(final_history) == PLACE_FINAL_CONFIRM_FRAMES
             and all(item[0] is not None for item in final_history)
             and all(
-                item[1] >= PLACE_CAMERA_SUCCESS_COVERAGE
+                item[1] >= PLACE_PROJECTED_SUCCESS_COVERAGE
                 for item in final_history
             )
         ):
@@ -270,11 +424,13 @@ def place_verified_transport(
             spread = float(
                 np.linalg.norm(centroids - center, axis=1).max()
             )
-            stable = spread <= PLACE_FINAL_MAX_SPREAD_PX
+            stable = spread <= PLACE_FINAL_MAX_SPREAD_M
         report["place_evidence_frames"] = (
             PLACE_FINAL_CONFIRM_FRAMES if stable else 0
         )
-        report["image_target_coverage"] = coverage
+        report["image_target_coverage"] = image_coverage
+        report["projected_target_coverage"] = coverage
+        report["projected_geometry"] = geometry
 
     def release_clear_and_verify():
         final_history.clear()

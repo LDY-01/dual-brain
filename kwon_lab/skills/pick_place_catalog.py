@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 
 from skills.block_reacquisition import (
-    SIM_OVERHEAD_PIXEL_TO_TABLE,
+    SIM_OVERHEAD_BLOCK_PIXEL_TO_TABLE,
     SIM_OVERHEAD_TARGET_PIXEL_TO_TABLE,
     locate_overhead_target,
     pick_until_verified,
@@ -32,7 +32,10 @@ class PickPlaceRuntime:
     env: object
     frames: list = field(default_factory=list)
     block_matrix: object = field(
-        default_factory=lambda: np.asarray(SIM_OVERHEAD_PIXEL_TO_TABLE).copy()
+        default_factory=lambda: {
+            name: np.asarray(matrix).copy()
+            for name, matrix in SIM_OVERHEAD_BLOCK_PIXEL_TO_TABLE.items()
+        }
     )
     target_matrix: object = field(
         default_factory=lambda: np.asarray(
@@ -42,6 +45,14 @@ class PickPlaceRuntime:
     max_pick_attempts: int = 6
     max_task_cycles: int = 3
     max_task_duration_s: float = 300.0
+    stage_budgets_s: dict[str, float] = field(
+        default_factory=lambda: {
+            "observe": 5.0,
+            "pick": 200.0,
+            "transport": 45.0,
+            "place": 85.0,
+        }
+    )
     overhead_calibration: object | None = None
     target: object | None = None
 
@@ -160,6 +171,7 @@ def _place(context, params):
             runtime.overhead_calibration,
             frames=runtime.frames,
             target_matrix=runtime.target_matrix,
+            block_matrix=runtime.block_matrix,
             on_place_step=params.get("on_place_step"),
             conservative=_state(context, "recovery_grasp"),
         )
@@ -284,6 +296,17 @@ def run_registered_pick_place(
             "recovery_grasp": False,
         },
         audit_path=Path(audit_path) if audit_path else None,
+        skill_stages={
+            "observe_target": "observe",
+            "pick": "pick",
+            "recover_pick": "pick",
+            "transport": "transport",
+            "place_6cm": "place",
+        },
+        stage_budget_remaining_s={
+            str(name): float(seconds)
+            for name, seconds in runtime.stage_budgets_s.items()
+        },
     )
     context.operation_deadline_s = (
         context.clock() + float(runtime.max_task_duration_s)
@@ -318,6 +341,11 @@ def run_registered_pick_place(
         "cycles_attempted": cycles_attempted,
         "max_task_cycles": runtime.max_task_cycles,
         "max_task_duration_s": runtime.max_task_duration_s,
+        "stage_budgets_s": {
+            str(name): float(seconds)
+            for name, seconds in runtime.stage_budgets_s.items()
+        },
+        "stage_budget_remaining_s": dict(context.stage_budget_remaining_s),
         "registered_skills": list(executor.registry.names()),
         "executions": [execution.to_dict() for execution in executions],
     }

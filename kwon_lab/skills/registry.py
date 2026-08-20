@@ -61,6 +61,9 @@ class SkillContext:
     clock: Callable[[], float] = time.monotonic
     active_deadline_s: float | None = None
     operation_deadline_s: float | None = None
+    active_deadline_reason: str = "active skill deadline exceeded"
+    skill_stages: dict[str, str] = field(default_factory=dict)
+    stage_budget_remaining_s: dict[str, float] = field(default_factory=dict)
 
     def check_deadline(self) -> None:
         now = self.clock()
@@ -73,7 +76,7 @@ class SkillContext:
             self.active_deadline_s is not None
             and now > self.active_deadline_s
         ):
-            raise SkillDeadlineExceeded("active skill deadline exceeded")
+            raise SkillDeadlineExceeded(self.active_deadline_reason)
 
 
 @dataclass
@@ -86,6 +89,9 @@ class SkillExecution:
     result: Any = None
     recovered: bool = False
     recovery: list["SkillExecution"] = field(default_factory=list)
+    stage: str | None = None
+    stage_budget_before_s: float | None = None
+    stage_budget_after_s: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return _json_safe(asdict(self))
@@ -153,6 +159,7 @@ class SkillExecutor:
     ) -> SkillExecution:
         params = params or {}
         spec = self.registry.get(name)
+        stage = self.context.skill_stages.get(name)
 
         for condition in spec.preconditions:
             try:
@@ -175,8 +182,39 @@ class SkillExecutor:
                 return execution
 
         start = self.context.clock()
+        stage_budget_before = (
+            float(self.context.stage_budget_remaining_s[stage])
+            if stage in self.context.stage_budget_remaining_s
+            else None
+        )
+        if stage_budget_before is not None and stage_budget_before <= 0.0:
+            if spec.apply_effects is not None:
+                spec.apply_effects(self.context, None, False)
+            execution = SkillExecution(
+                skill=name,
+                status="timed_out",
+                success=False,
+                elapsed_s=0.0,
+                failure_reason=f"{stage} stage budget exhausted",
+                stage=stage,
+                stage_budget_before_s=stage_budget_before,
+                stage_budget_after_s=stage_budget_before,
+            )
+            self._audit(execution)
+            return execution
+
+        effective_timeout_s = float(spec.timeout_s)
+        if stage_budget_before is not None:
+            effective_timeout_s = min(effective_timeout_s, stage_budget_before)
         previous_deadline = self.context.active_deadline_s
-        self.context.active_deadline_s = start + spec.timeout_s
+        previous_deadline_reason = self.context.active_deadline_reason
+        self.context.active_deadline_s = start + effective_timeout_s
+        self.context.active_deadline_reason = (
+            f"{stage} stage budget exceeded"
+            if stage_budget_before is not None
+            and stage_budget_before < spec.timeout_s
+            else "active skill deadline exceeded"
+        )
         result = None
         status = "failed"
         failure_reason = None
@@ -184,10 +222,11 @@ class SkillExecutor:
         try:
             result = spec.run(self.context, params)
             elapsed = max(0.0, self.context.clock() - start)
-            if elapsed > spec.timeout_s:
+            if elapsed > effective_timeout_s:
                 status = "timed_out"
                 failure_reason = (
-                    f"elapsed {elapsed:.3f}s exceeded timeout {spec.timeout_s:.3f}s"
+                    f"elapsed {elapsed:.3f}s exceeded timeout "
+                    f"{effective_timeout_s:.3f}s"
                 )
             else:
                 succeeded = bool(spec.success_verifier(self.context, result))
@@ -200,7 +239,9 @@ class SkillExecutor:
             elapsed = max(0.0, self.context.clock() - start)
             status = "timed_out"
             succeeded = False
-            failure_reason = f"{exc}; skill timeout {spec.timeout_s:.3f}s"
+            failure_reason = (
+                f"{exc}; effective timeout {effective_timeout_s:.3f}s"
+            )
             if spec.apply_effects is not None:
                 spec.apply_effects(self.context, None, False)
         except Exception as exc:
@@ -210,6 +251,12 @@ class SkillExecutor:
             failure_reason = f"{type(exc).__name__}:{exc}"
         finally:
             self.context.active_deadline_s = previous_deadline
+            self.context.active_deadline_reason = previous_deadline_reason
+
+        stage_budget_after = None
+        if stage_budget_before is not None:
+            stage_budget_after = max(0.0, stage_budget_before - elapsed)
+            self.context.stage_budget_remaining_s[stage] = stage_budget_after
 
         execution = SkillExecution(
             skill=name,
@@ -218,6 +265,9 @@ class SkillExecutor:
             elapsed_s=elapsed,
             failure_reason=failure_reason,
             result=result,
+            stage=stage,
+            stage_budget_before_s=stage_budget_before,
+            stage_budget_after_s=stage_budget_after,
         )
 
         if not succeeded and allow_recovery and spec.recovery_plan:
