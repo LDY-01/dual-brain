@@ -10,13 +10,15 @@
 2. 카메라 광축이 테이블을 거의 수직으로 보도록 고정한다.
 3. SO-101의 shoulder-pan 회전축을 테이블에 수직으로 내린 점을 XY 원점으로 사용한다.
 4. 로봇에서 앞쪽을 +X, 로봇이 바라보는 기준 왼쪽을 +Y로 사용한다.
-5. 전체 1.4×0.6m 테이블이 아니라 로봇이 닿는 약 X=18~28cm, Y=-10~10cm 영역이 선명하게 보이면 된다.
+5. 전체 1.4×0.6m 테이블을 모두 볼 필요는 없지만, `real_workspace.local.json`에 확정한 실제 작업영역과 경계 복구 여유 2cm는 전부 선명하게 보여야 한다. 초기 제안 범위는 X=10~32cm, Y=-16~24cm이며, 실제로 더 좁게 쓸 경우 먼저 작업영역 설정과 테이프 표시를 함께 변경한다.
+
+상단 호모그래피는 보정점이 만드는 볼록껍질 밖으로 외삽하지 않는다. 블록 시작 위치·목표 구역·경계 복구 지점이 모두 보정점 내부에 있어야 한다.
 
 카메라 설치 후에는 브래킷, 해상도, 줌, 초점을 바꾸지 않는다. 하나라도 바꾸면 다시 보정한다.
 
 ## 카메라 역할 등록
 
-2026-08-19 현재 Windows PnP 목록에는 외부 `720p HD Camera` 한 대가 보이지만 손목·상단 역할은 모두 미등록 상태다. OpenCV index만으로 역할을 확정하지 않으며 PnP 장치 ID, 물리 USB 포트 라벨, 사람이 확인한 화면을 함께 등록한다. 설정 파일은 `config/real_camera_roles.local.json`이며 장비별 정보이므로 Git에 포함하지 않는다.
+2026-08-19 이전 장소에서는 노트북 내장 카메라 index 0, 손목 U20CAM index 1, 상단 U20CAM index 2를 화면과 한 대씩 분리 연결한 PnP 비교로 확인했고 두 역할의 1280×720 실시간 검사도 통과했다. 다만 USB 재연결과 장소 이동 후 index는 바뀔 수 있으므로, 새 장소에서는 이전 값을 그대로 신뢰하지 않고 PnP 장치 ID·물리 USB 포트 라벨·사람이 확인한 화면을 다시 대조한다. 설정 파일은 `config/real_camera_roles.local.json`이며 장비별 정보이므로 Git에 포함하지 않는다.
 
 현재 상태 확인:
 
@@ -47,7 +49,7 @@ $env:PYTHONPATH='kwon_lab'
 
 ## 기준점 표시
 
-`config/overhead_calibration_points.example.json`의 6개 XY 위치를 줄자와 직각자를 이용해 테이블에 표시한다. 점의 중심 오차가 그대로 로봇 집기 오차가 되므로 가능한 한 2mm 이내로 표시한다.
+`config/overhead_calibration_points.example.json`의 6개 XY 위치를 줄자와 직각자를 이용해 테이블에 표시한다. 예시 외곽점은 제안 작업영역 X=10~32cm, Y=-16~24cm에 2cm 복구 여유를 더한 X=8~34cm, Y=-18~26cm를 둘러싼다. 실제 작업영역을 변경하면 점도 함께 바꿔 작업영역과 복구 여유가 보정점 볼록껍질 안에 있도록 한다. 프리플라이트가 이 포함 관계를 자동 검사하며, 점의 중심 오차가 그대로 로봇 집기 오차가 되므로 가능한 한 2mm 이내로 표시한다.
 
 ## 실행
 
@@ -60,7 +62,7 @@ $env:PYTHONPATH='kwon_lab'
   --backend dshow `
   --width 1280 `
   --height 720 `
-  --lens-height-m 0.52 `
+  --lens-height-m <실측_렌즈부터_테이블까지_m> `
   --layout-id <NEW_WORKSPACE_LAYOUT_ID> `
   --plane target_table `
   --output config/overhead_camera_calibration.local.json

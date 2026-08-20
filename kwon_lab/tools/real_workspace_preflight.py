@@ -45,7 +45,16 @@ def run_self_test():
             "layout_id": layout_id,
             "camera_index": 2,
             "planes": {
-                "target_table": {"pixel_to_table_homography": matrix, "max_error_m": 0.004},
+                "target_table": {
+                    "pixel_to_table_homography": matrix,
+                    "max_error_m": 0.004,
+                    "reference_points": [
+                        {"table_xy_m": [0.08, -0.18]},
+                        {"table_xy_m": [0.08, 0.26]},
+                        {"table_xy_m": [0.34, -0.18]},
+                        {"table_xy_m": [0.34, 0.26]},
+                    ],
+                },
                 "upright_top_6cm": {"pixel_to_table_homography": matrix},
                 "tipped_top_4cm": {"pixel_to_table_homography": matrix},
             },
@@ -55,6 +64,7 @@ def run_self_test():
             "camera_pillar_secured": True,
             "robot_base_secured": True,
             "workspace_clear": True,
+            "task_workspace_marked": True,
             "emergency_stop_ready": True,
             "camera_views_visually_confirmed": True,
         }
@@ -62,6 +72,11 @@ def run_self_test():
             "format_version": 1,
             "layout_id": layout_id,
             "table": {"surface": "white_matte_ceramic", "surface_confirmed": True},
+            "task_workspace": {
+                "x_bounds_m": [0.10, 0.32],
+                "y_bounds_m": [-0.16, 0.24],
+                "recovery_guard_margin_m": 0.02,
+            },
             "operator_checks": operator,
         })
         camera_status = {
@@ -76,11 +91,51 @@ def run_self_test():
             probe_cameras=False,
             camera_status_override=camera_status,
         )
+        oversized_workspace_payload = {
+            "format_version": 1,
+            "layout_id": layout_id,
+            "table": {"surface": "white_matte_ceramic", "surface_confirmed": True},
+            "task_workspace": {
+                "x_bounds_m": [0.10, 0.40],
+                "y_bounds_m": [-0.16, 0.24],
+                "recovery_guard_margin_m": 0.02,
+            },
+            "operator_checks": operator,
+        }
+        _write(workspace, oversized_workspace_payload)
+        uncovered_workspace = evaluate_real_preflight(
+            camera, safety, calibration, workspace,
+            probe_cameras=False,
+            camera_status_override=camera_status,
+        )
+        operator["task_workspace_marked"] = False
+        _write(workspace, {
+            "format_version": 1,
+            "layout_id": layout_id,
+            "table": {"surface": "white_matte_ceramic", "surface_confirmed": True},
+            "task_workspace": {
+                "x_bounds_m": [0.10, 0.32],
+                "y_bounds_m": [-0.16, 0.24],
+                "recovery_guard_margin_m": 0.02,
+            },
+            "operator_checks": operator,
+        })
+        unmarked_workspace = evaluate_real_preflight(
+            camera, safety, calibration, workspace,
+            probe_cameras=False,
+            camera_status_override=camera_status,
+        )
+        operator["task_workspace_marked"] = True
         operator["emergency_stop_ready"] = False
         _write(workspace, {
             "format_version": 1,
             "layout_id": layout_id,
             "table": {"surface": "white_matte_ceramic", "surface_confirmed": True},
+            "task_workspace": {
+                "x_bounds_m": [0.10, 0.32],
+                "y_bounds_m": [-0.16, 0.24],
+                "recovery_guard_margin_m": 0.02,
+            },
             "operator_checks": operator,
         })
         blocked = evaluate_real_preflight(
@@ -90,6 +145,8 @@ def run_self_test():
         )
         report = {
             "valid_setup_authorized": passed["motion_authorized"],
+            "uncovered_workspace_blocked": not uncovered_workspace["motion_authorized"],
+            "unmarked_task_workspace_blocked": not unmarked_workspace["motion_authorized"],
             "missing_emergency_stop_blocked": not blocked["motion_authorized"],
         }
         report["passed"] = all(report.values())
