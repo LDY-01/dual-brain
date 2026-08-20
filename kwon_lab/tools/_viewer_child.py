@@ -2,11 +2,15 @@
 
 import sys
 import time
+from pathlib import Path
 
 import mujoco
 import mujoco.viewer
 
-m = mujoco.MjModel.from_xml_path(sys.argv[1])  # XML 오류면 여기서 비정상 종료 → 부모가 처리
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from envs.so101_pick_env import load_mj_model
+
+m = load_mj_model(sys.argv[1])  # XML 오류면 여기서 비정상 종료 → 부모가 처리
 d = mujoco.MjData(m)
 
 with mujoco.viewer.launch_passive(m, d) as v:

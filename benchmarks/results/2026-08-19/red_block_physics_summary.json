@@ -1,0 +1,73 @@
+{
+  "date": "2026-08-19",
+  "checkpoint": "act_pick_v22",
+  "evaluation": {
+    "seeds": [5000, 5049],
+    "episodes_per_profile": 50,
+    "n_action_steps": 10,
+    "reobservation_seconds": 0.4,
+    "success_criterion": "pose-aware block contact footprint coverage >= 0.75",
+    "aim_mode": "legacy_v22_frozen_2026_08_12"
+  },
+  "measured_object": {
+    "dimensions_mm": [40.0, 40.0, 60.0],
+    "mass_g": 28.6,
+    "material": "PLA",
+    "finish": "matte",
+    "edge_fillet_radius_mm": 1.0,
+    "step_volume_mm3": 95881.16218547773,
+    "collision_mesh_tessellation_tolerance_mm": 0.02,
+    "mass_distribution_assumption": "uniform over the outer mesh; actual shell and infill distribution is unknown"
+  },
+  "new_workspace_table": {
+    "surface": "white matte ceramic",
+    "source": "user-confirmed",
+    "pla_contact_friction_measured": false
+  },
+  "profiles": {
+    "legacy_96g": {
+      "geometry": "sharp 40x40x60 mm box",
+      "mass_g": 96.0,
+      "sliding_friction": 1.0,
+      "task_successes": 16,
+      "episodes": 50,
+      "task_success_rate": 0.32,
+      "lift_verified": 32,
+      "mean_final_distance_m": 0.10725949100797381
+    },
+    "real_28g": {
+      "geometry": "supplied STEP, 40x40x60 mm, all outer edges R1 mm",
+      "mass_g": 28.6,
+      "sliding_friction_uniform_range": [0.25, 0.8],
+      "task_successes": 16,
+      "episodes": 50,
+      "task_success_rate": 0.32,
+      "wilson_95_interval": [0.20758044093999403, 0.45810557136276076],
+      "lift_verified": 34,
+      "mean_final_distance_m": 0.10733640584992901,
+      "success_by_friction_tercile": [
+        {"range": [0.25, 0.43333333333333335], "episodes": 18, "successes": 5},
+        {"range": [0.43333333333333335, 0.6166666666666667], "episodes": 20, "successes": 6},
+        {"range": [0.6166666666666667, 0.8], "episodes": 12, "successes": 5}
+      ]
+    }
+  },
+  "direct_run_pairing": {
+    "legacy_success_real_failure": 10,
+    "legacy_failure_real_success": 10,
+    "same_outcome": 30,
+    "exact_mcnemar_two_sided_p": 1.0
+  },
+  "decision": {
+    "immediate_retraining_due_to_mass_change": false,
+    "reason": "The measured-physics profile did not reduce aggregate task success, lift verification, or mean final distance versus the current-code legacy rerun.",
+    "absolute_policy_quality_acceptable_for_real_deployment": false,
+    "next_gate": "Calibrate the real cameras and run 10 low-speed first-pick trials before deciding on physics-randomized fine-tuning."
+  },
+  "limitations": [
+    "The new table is confirmed as white matte ceramic, but its PLA contact friction was not measured; the friction interval is an uncertainty sweep.",
+    "The actual slicer job and internal mass distribution are unconfirmed.",
+    "The 32 percent result is a simulation estimate and is not a real-robot success claim.",
+    "Raw per-episode diagnostic JSON remains local under results/ and is not a GitHub publication artifact."
+  ]
+}

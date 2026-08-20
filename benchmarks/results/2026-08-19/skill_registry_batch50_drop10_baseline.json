@@ -1,0 +1,52 @@
+{
+  "date": "2026-08-19",
+  "variant": "pre_improvement_baseline",
+  "runtime_privileged_object_state": false,
+  "truth_used_after_episode_for_scoring_only": true,
+  "object_profile": "real_28g",
+  "normal": {
+    "seed_range": [12000, 12049],
+    "episodes": 50,
+    "state_machine_successes": 41,
+    "state_machine_success_rate": 0.82,
+    "truth_successes": 40,
+    "truth_success_rate": 0.8,
+    "camera_truth_disagreements": 1,
+    "false_positive_seeds": [12044],
+    "recovery_used": 10,
+    "mean_pick_attempts": 2.34,
+    "max_pick_attempts": 9,
+    "mean_wall_time_s": 119.846,
+    "median_wall_time_s": 91.57,
+    "p95_wall_time_s": 211.687,
+    "max_wall_time_s": 626.588,
+    "declared_timeout_overruns": 2,
+    "final_block_unreachable": 5
+  },
+  "forced_place_drop": {
+    "seed_range": [13000, 13009],
+    "episodes": 10,
+    "faults_injected": 10,
+    "state_machine_successes": 4,
+    "state_machine_success_rate": 0.4,
+    "truth_successes": 5,
+    "truth_success_rate": 0.5,
+    "camera_truth_disagreements": 1,
+    "false_negative_seeds": [13001],
+    "faults_recovered": 4,
+    "mean_wall_time_s": 151.862,
+    "p95_wall_time_s": 234.46,
+    "top_level_failure_reasons": {
+      "drop_during_place_approach": 6
+    },
+    "deep_recovery_failure_reasons": {
+      "place_not_confirmed": 4,
+      "transport_drop": 1,
+      "timeout_then_drop_during_place_approach": 1
+    }
+  },
+  "raw_local_files": [
+    "outputs/skill_registry_batch_2026-08-19/episodes.jsonl",
+    "outputs/skill_registry_batch_2026-08-19/summary.json"
+  ]
+}

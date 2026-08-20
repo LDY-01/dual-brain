@@ -1,0 +1,111 @@
+{
+  "date": "2026-08-20",
+  "scope": "s6_recovery_cursor_and_place_alignment_limit_validation",
+  "protocol": {
+    "runtime_privileged_object_state": false,
+    "truth_used_after_episode_for_scoring_only": true,
+    "object_profile": "real_28g",
+    "normal_seed_range": [20000, 20049],
+    "forced_place_drop_seed_range": [21000, 21009],
+    "task_success_coverage_required": 0.75,
+    "camera_success_coverage_required": 0.76,
+    "success_coverage_method": "physical_footprint_projected_polygon_intersection",
+    "max_task_duration_s": 300.0
+  },
+  "implementation": {
+    "recovery_config_cursor": "recovery candidates advance across task cycles and wrap by pose-specific candidate count instead of restarting from candidate zero",
+    "boundary_recovery": "within 4 cm of an edge, the recovery target is biased inward and the pre-grasp enters from the outside side while remaining inside the workspace",
+    "place_alignment_limit_m": 0.02,
+    "place_alignment_reason": "the calibrated transport target is retained as an anchor so height/parallax or occlusion error cannot move the 6 cm release arbitrarily far from the target"
+  },
+  "targeted_regression": {
+    "converted_previous_failures": [18000, 18001, 18005, 19001],
+    "previous_success_seeds_retained": [18003, 18004, 18006, 18007],
+    "forced_drop_subset": "4/4",
+    "camera_truth_disagreements": 0,
+    "representative_seed_18001": {
+      "before": "pick stage budget exhausted after 275.1 seconds",
+      "after": "success after 103.2 seconds",
+      "alignment_limited_at_m": 0.02,
+      "camera_projected_coverage": 0.7660644068864991,
+      "truth_coverage": 0.7860790110185434
+    }
+  },
+  "independent_normal_50": {
+    "episodes": 50,
+    "state_machine_successes": 45,
+    "truth_successes": 45,
+    "truth_success_rate": 0.9,
+    "truth_wilson_95_interval": [0.7863976856252035, 0.9565242350681096],
+    "camera_truth_disagreements": 0,
+    "boundary_guard_activations": 15,
+    "stage_budget_exhaustions": 4,
+    "final_block_unreachable": 2,
+    "mean_wall_time_s": 112.07861667201854,
+    "max_wall_time_s": 300.59404720016755,
+    "place_attempts": 50,
+    "place_alignment_limited_attempts": 13,
+    "failure_seeds": [20011, 20014, 20015, 20028, 20037],
+    "failure_reasons": {
+      "pick_stage_budget_exhausted": 2,
+      "block_outside_workspace": 1,
+      "overall_task_deadline": 1,
+      "transport_stage_budget_exhausted": 1
+    }
+  },
+  "independent_forced_place_drop_10": {
+    "episodes": 10,
+    "faults_injected": 10,
+    "state_machine_successes": 8,
+    "truth_successes": 8,
+    "truth_success_rate": 0.8,
+    "truth_wilson_95_interval": [0.49016247153664183, 0.9433178485456247],
+    "camera_truth_disagreements": 0,
+    "faults_recovered": 8,
+    "boundary_guard_activations": 3,
+    "stage_budget_exhaustions": 0,
+    "final_block_unreachable": 2,
+    "mean_wall_time_s": 99.7644778400194,
+    "max_wall_time_s": 182.43663210002705,
+    "place_attempts": 13,
+    "place_alignment_limited_attempts": 3,
+    "failure_seeds": [21004, 21009],
+    "failure_reasons": {
+      "block_outside_workspace": 2
+    }
+  },
+  "comparison_to_previous_final": {
+    "normal": {
+      "previous": "40/50 (80%)",
+      "current": "45/50 (90%)",
+      "change_percentage_points": 10.0
+    },
+    "forced_place_drop": {
+      "previous": "8/10 (80%)",
+      "current": "8/10 (80%)",
+      "change_percentage_points": 0.0
+    }
+  },
+  "entry_gate": {
+    "normal_success_rate_required": 0.85,
+    "normal_passed": true,
+    "forced_drop_recoveries_required": "8/10",
+    "forced_drop_passed": true,
+    "camera_truth_disagreements_required": 0,
+    "camera_truth_disagreements_passed": true,
+    "shadow_mode_ready_as_next_step": true,
+    "shadow_mode_executed": false
+  },
+  "remaining_risks": [
+    "five of fifty independent normal episodes still failed",
+    "one normal and two forced-drop episodes ended outside the workspace",
+    "the real overhead homographies and shoulder-pan limit must be recalibrated in the new workspace",
+    "the 90 percent result is simulation performance and does not establish real-robot success"
+  ],
+  "raw_local_outputs": [
+    "outputs/skill_registry_place_alignment_limit_smoke_2026-08-20/episodes.jsonl",
+    "outputs/skill_registry_place_limit_targeted_regression_2026-08-20/episodes.jsonl",
+    "outputs/skill_registry_place_limit_independent50_2026-08-20/episodes.jsonl",
+    "outputs/skill_registry_place_limit_forced10_2026-08-20/episodes.jsonl"
+  ]
+}
