@@ -1,0 +1,97 @@
+{
+  "date": "2026-08-20",
+  "scope": "s6_improved_camera_pick_place_validation",
+  "protocol": {
+    "runtime_privileged_object_state": false,
+    "truth_used_after_episode_for_scoring_only": true,
+    "object_profile": "real_28g",
+    "success_truth_coverage": 0.75,
+    "camera_success_coverage": 0.78,
+    "max_task_cycles": 3,
+    "max_task_duration_s": 300.0
+  },
+  "pre_improvement_baseline": {
+    "normal": {
+      "episodes": 50,
+      "state_machine_successes": 41,
+      "truth_successes": 40,
+      "truth_success_rate": 0.8,
+      "camera_truth_disagreements": 1,
+      "max_wall_time_s": 626.588
+    },
+    "forced_place_drop": {
+      "episodes": 10,
+      "faults_injected": 10,
+      "state_machine_successes": 4,
+      "truth_successes": 5,
+      "truth_success_rate": 0.5,
+      "camera_truth_disagreements": 1
+    }
+  },
+  "post_improvement_normal_150": {
+    "seed_ranges": [[14000, 14049], [14100, 14199]],
+    "episodes": 150,
+    "state_machine_successes": 125,
+    "state_machine_success_rate": 0.8333333333333334,
+    "state_machine_wilson_95_interval": [0.7655341358309921, 0.884485701256957],
+    "truth_successes": 124,
+    "truth_success_rate": 0.8266666666666667,
+    "truth_wilson_95_interval": [0.7581400726100628, 0.8788793677361272],
+    "camera_truth_disagreements": 3,
+    "false_positive_seeds": [14040, 14189],
+    "false_negative_seeds": [14037],
+    "mean_pick_attempts": 2.033333333333333,
+    "max_pick_attempts": 10,
+    "mean_wall_time_s": 119.13550368466726,
+    "median_wall_time_s": 78.46751729992684,
+    "p95_wall_time_s": 300.54668938996036,
+    "max_wall_time_s": 300.68256879993714,
+    "recovery_attempted": 59,
+    "recovery_used": 38,
+    "state_machine_failure_reasons": {
+      "overall_task_deadline": 13,
+      "block_outside_workspace": 12
+    }
+  },
+  "post_improvement_forced_place_drop_20": {
+    "seed_range": [15000, 15019],
+    "episodes": 20,
+    "faults_injected": 20,
+    "state_machine_successes": 11,
+    "state_machine_success_rate": 0.55,
+    "truth_successes": 11,
+    "truth_success_rate": 0.55,
+    "wilson_95_interval": [0.34208534245034233, 0.7418021417443759],
+    "camera_truth_disagreements": 0,
+    "faults_recovered": 11,
+    "mean_pick_attempts": 4.35,
+    "max_pick_attempts": 8,
+    "mean_wall_time_s": 182.83843361000763,
+    "median_wall_time_s": 169.51936284988187,
+    "p95_wall_time_s": 300.5807533049374,
+    "max_wall_time_s": 300.58786129998043,
+    "state_machine_failure_reasons": {
+      "overall_task_deadline": 4,
+      "block_outside_workspace": 5
+    }
+  },
+  "comparison": {
+    "normal_truth_success_change_percentage_points": 2.6666666666666665,
+    "forced_drop_truth_success_change_percentage_points": 5.0,
+    "max_wall_time_reduction_s": 325.90543120006285,
+    "general_success_improvement_proven": false,
+    "forced_drop_recovery_sufficient": false
+  },
+  "remaining_risks": [
+    "block pushed outside the reachable workspace",
+    "difficult recovery cycles consume the 300 second task budget",
+    "camera coverage disagreement near the 75 percent truth boundary",
+    "forced place-drop recovery succeeds in only 11 of 20 independent episodes"
+  ],
+  "raw_local_outputs": [
+    "outputs/skill_registry_improved_new50_2026-08-20/episodes.jsonl",
+    "outputs/skill_registry_improved_new50_2026-08-20/summary.json",
+    "outputs/skill_registry_improved_overnight_2026-08-20/episodes.jsonl",
+    "outputs/skill_registry_improved_overnight_2026-08-20/summary.json"
+  ]
+}
