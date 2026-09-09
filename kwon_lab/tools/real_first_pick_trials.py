@@ -51,17 +51,47 @@ def _save_session(path, payload):
 
 
 def run_self_test():
-    trials = [
+    eight_successes = [
         {"success": index < 8, "lift_verified": index < 8,
          "failure_stage": None if index < 8 else "missed_grasp"}
         for index in range(10)
     ]
-    passed = summarize_first_pick_trials(trials)
-    failed = summarize_first_pick_trials(trials[:-1])
+    nine_successes = [
+        {"success": index < 9, "lift_verified": index < 9,
+         "failure_stage": None if index < 9 else "missed_grasp"}
+        for index in range(10)
+    ]
+    safety_guard = [dict(item) for item in nine_successes]
+    safety_guard[-1]["failure_stage"] = "safety_guard"
+    operator_abort = [dict(item) for item in nine_successes]
+    operator_abort[-1]["failure_stage"] = "operator_abort"
+    additional = summarize_first_pick_trials(eight_successes)
+    passed = summarize_first_pick_trials(nine_successes)
+    blocked = summarize_first_pick_trials(safety_guard)
+    aborted = summarize_first_pick_trials(operator_abort)
+    incomplete = summarize_first_pick_trials(nine_successes[:-1])
     report = {
-        "eight_of_ten_passes": passed["passed"],
-        "nine_records_is_incomplete": not failed["complete"] and not failed["passed"],
-        "failure_count_preserved": passed["failure_counts"].get("missed_grasp") == 2,
+        "eight_of_ten_requires_additional_trials": (
+            not additional["passed"]
+            and additional["recommendation"] == "collect_10_additional_trials"
+        ),
+        "nine_of_ten_passes": passed["passed"],
+        "safety_guard_blocks_expansion": (
+            not blocked["passed"]
+            and blocked["recommendation"]
+            == "review_failures_before_motion_expansion_or_finetuning"
+        ),
+        "operator_abort_blocks_expansion": (
+            not aborted["passed"]
+            and aborted["recommendation"]
+            == "review_failures_before_motion_expansion_or_finetuning"
+        ),
+        "nine_records_is_incomplete": (
+            not incomplete["complete"] and not incomplete["passed"]
+        ),
+        "failure_count_preserved": (
+            additional["failure_counts"].get("missed_grasp") == 2
+        ),
     }
     report["passed"] = all(report.values())
     print(json.dumps(report, indent=2))
@@ -75,7 +105,7 @@ def main():
     parser.add_argument("--calibration-config", type=Path, default=Path("config/overhead_camera_calibration.local.json"))
     parser.add_argument("--workspace-config", type=Path, default=Path("config/real_workspace.local.json"))
     parser.add_argument("--trials", type=int, default=10)
-    parser.add_argument("--pass-successes", type=int, default=8)
+    parser.add_argument("--pass-successes", type=int, default=9)
     parser.add_argument("--output-root", type=Path, default=Path("results/real_first_pick"))
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args()

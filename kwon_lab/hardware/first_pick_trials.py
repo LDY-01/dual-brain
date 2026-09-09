@@ -17,7 +17,7 @@ FAILURE_STAGES = (
 )
 
 
-def summarize_first_pick_trials(trials, expected_trials=10, pass_successes=8):
+def summarize_first_pick_trials(trials, expected_trials=10, pass_successes=9):
     successes = sum(bool(item.get("success")) for item in trials)
     lifts = sum(bool(item.get("lift_verified")) for item in trials)
     failures = Counter(
@@ -26,11 +26,18 @@ def summarize_first_pick_trials(trials, expected_trials=10, pass_successes=8):
         if not item.get("success")
     )
     complete = len(trials) == expected_trials
-    passed = complete and successes >= pass_successes
+    blocking_failures = {
+        name: failures.get(name, 0)
+        for name in ("safety_guard", "operator_abort")
+        if failures.get(name, 0)
+    }
+    passed = complete and successes >= pass_successes and not blocking_failures
     if not complete:
         recommendation = "complete_remaining_trials"
-    elif passed and not failures.get("safety_guard"):
+    elif passed:
         recommendation = "proceed_to_low_speed_place_validation"
+    elif successes == pass_successes - 1 and not blocking_failures:
+        recommendation = "collect_10_additional_trials"
     else:
         recommendation = "review_failures_before_motion_expansion_or_finetuning"
     return {
@@ -41,6 +48,7 @@ def summarize_first_pick_trials(trials, expected_trials=10, pass_successes=8):
         "success_rate": successes / len(trials) if trials else 0.0,
         "lift_verified": lifts,
         "failure_counts": dict(sorted(failures.items())),
+        "blocking_failure_counts": blocking_failures,
         "pass_threshold_successes": int(pass_successes),
         "passed": passed,
         "recommendation": recommendation,
