@@ -8,7 +8,6 @@ import time
 from pathlib import Path
 
 import numpy as np
-
 from lerobot.robots.so_follower import SO101Follower
 from lerobot.robots.so_follower.config_so_follower import SO101FollowerConfig
 
@@ -18,7 +17,6 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from kwon_lab.hardware.joint_safety import load_safety_limits, safe_send_action
-
 
 JOINTS = (
     "shoulder_pan",
@@ -79,7 +77,12 @@ def main() -> None:
         max_relative_target=5.0,
     )
     robot = SO101Follower(config)
-    robot.connect(calibrate=False)
+    if args.dry_run:
+        # A real dry-run opens only the calibrated read bus.  SO101Follower.connect()
+        # configures motor registers and toggles torque, so it must not be used here.
+        robot.bus.connect()
+    else:
+        robot.connect(calibrate=False)
     try:
         observation = robot.get_observation()
         start = np.array([observation[f"{joint}.pos"] for joint in JOINTS], dtype=float)
@@ -102,13 +105,16 @@ def main() -> None:
             )
             for item in interventions:
                 print(
-                    "SAFETY CLAMP: shoulder_pan "
+                    f"SAFETY CLAMP: {item['joint']} "
                     f"{item['requested_deg']:.2f} -> {item['applied_deg']:.2f} deg"
                 )
             time.sleep(1 / args.hz)
         print("Home return complete.")
     finally:
-        robot.disconnect()
+        if args.dry_run:
+            robot.bus.disconnect(False)
+        else:
+            robot.disconnect()
 
 
 if __name__ == "__main__":

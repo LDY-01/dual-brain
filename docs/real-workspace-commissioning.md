@@ -28,7 +28,14 @@ $env:PYTHONPATH='kwon_lab'
   --physical-usb-port OVERHEAD_FIXED_PORT --confirm-view OVERHEAD
 ```
 
-장치 ID가 현재 Windows 목록에 없거나, 두 역할이 같은 index/장치 ID를 쓰거나, 물리 포트 라벨이 없으면 준비 완료로 인정하지 않는다.
+등록 후 `--probe --snapshot-dir ...`로 방금 저장한 두 영상을 열어 손목·상단 역할이 맞는지 다시 본다. 확인 즉시 다음 세션 확인을 생성한다.
+
+```powershell
+.\.venv\Scripts\python.exe kwon_lab/tools/register_real_cameras.py `
+  --confirm-session --confirm-both-views WRIST_OVERHEAD
+```
+
+세션 확인은 5분간만 유효하고 카메라 index·PnP 목록·등록이 바뀌면 즉시 무효화된다. 확인 후 카메라를 빼거나 포트를 바꿨다면 스냅샷부터 다시 실행한다. 장치 ID가 현재 Windows 목록에 없거나, 두 역할이 같은 index/장치 ID를 쓰거나, 물리 포트 라벨이 없으면 준비 완료로 인정하지 않는다.
 
 ## 2. 새 배치 ID와 현장 확인
 
@@ -50,7 +57,7 @@ $env:PYTHONPATH='kwon_lab'
   --layout-id <LAYOUT_ID> --plane target_table
 ```
 
-숄더팬 한계는 먼저 저장하지 않고 확인한 뒤 같은 명령에 `--save`를 붙인다. 보정은 최대 기준점 오차가 10mm 이하여야 하며 5mm 이하를 권장한다. 배치 ID가 다르면 값이 모두 존재해도 프리플라이트가 차단한다.
+숄더팬 기둥 한계는 먼저 저장하지 않고 확인한 뒤 같은 명령에 `--save`를 붙인다. 이 도구는 나머지 다섯 관절 값을 임의로 채우지 않는다. 읽기 전용 그림자 로그에서 제안된 범위를 확인하고, 장비 앞에서 각 관절의 최솟값·최댓값이 전체 경로에서 테이블·기둥·로봇 본체·케이블과 충돌하지 않는지 저속 수동 검수한 뒤 로컬 안전 파일에 입력한다. 6개 관절 모두 `min_deg`/`max_deg`와 `verified_collision_free=true`가 없으면 능동 동작은 계속 차단된다. 보정은 최대 기준점 오차가 10mm 이하여야 하며 5mm 이하를 권장한다. 배치 ID가 다르면 값이 모두 존재해도 프리플라이트가 차단한다.
 
 ## 4. 통합 프리플라이트
 
@@ -60,14 +67,14 @@ $env:PYTHONPATH='kwon_lab'
 
 다음을 모두 통과해야 `motion_authorized=true`가 된다.
 
-- 손목·상단 카메라의 index, PnP ID, USB 포트 라벨과 실시간 프레임
-- 고정된 새 배치의 숄더팬 절대 한계
+- 손목·상단 카메라의 index, PnP ID, USB 포트 라벨, 실시간 프레임과 5분 세션 육안 확인
+- 고정된 새 배치의 6개 관절 절대 작업 범위
 - 같은 배치에서 만든 상단 카메라 3개 높이 평면 보정
 - 흰색 무광 세라믹 작업대 확인
 - 로봇·기둥 고정, 작업영역 정리, 비상정지 준비, 두 화면 육안 확인
 - 실제 작업영역·목표·2cm 복구 여유의 테이프 표시와 상단 화면 포함
 
-`--skip-live-camera`는 진단용이며 항상 `motion_authorized=false`로 끝난다. 이 도구 자체는 모터를 제어하지 않는다.
+`--skip-live-camera`는 진단용이며 항상 `motion_authorized=false`로 끝난다. 통과 보고서는 15분간만 능동 모드에 사용할 수 있고, 보고서의 `layout_id`가 안전 범위 파일과 다르거나 필수 검사가 누락되면 거부된다. 이 도구 자체는 모터를 제어하지 않는다.
 
 ## 5. 최초 픽 10회 기록
 

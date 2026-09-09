@@ -7,36 +7,33 @@ send, including all clamps, but never calls ``robot.send_action``.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime
 import json
 import math
-from pathlib import Path
 import time
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
 from typing import Any, Mapping, Protocol
 
 import cv2
 import mujoco
 import numpy as np
 
-from hardware.camera_roles import BACKEND_IDS, CAMERA_ROLES, load_camera_registry
+from hardware.camera_roles import (
+    BACKEND_IDS,
+    CAMERA_ROLES,
+    load_camera_registry,
+    require_dual_camera_ready,
+)
 from hardware.joint_safety import (
-    SHOULDER_PAN_KEY,
+    JOINT_KEYS,
+    JOINT_NAMES,
     SafetyLimits,
-    assert_position_within_limits,
+    assert_positions_within_limits,
     enforce_action_limits,
 )
+from hardware.real_preflight import validate_motion_authorization_report
 
-
-JOINT_NAMES = (
-    "shoulder_pan",
-    "shoulder_lift",
-    "elbow_flex",
-    "wrist_flex",
-    "wrist_roll",
-    "gripper",
-)
-JOINT_KEYS = tuple(f"{name}.pos" for name in JOINT_NAMES)
 VALID_MODES = ("shadow", "active")
 DEFAULT_KINEMATICS_SCENE = (
     Path(__file__).resolve().parents[1]
@@ -199,6 +196,14 @@ def validate_adapter_config(config: AdapterConfig) -> None:
         raise ValueError("Only center_crop_resize is currently validated")
     if not config.confirmation_token:
         raise ValueError("active_mode.confirmation_token is required")
+    if not config.require_preflight:
+        raise ValueError(
+            "active_mode.require_motion_authorized_preflight must remain true"
+        )
+    if not config.require_verified_mapping:
+        raise ValueError(
+            "active_mode.require_all_joint_mappings_verified must remain true"
+        )
 
 
 def prepare_policy_image(rgb: np.ndarray, width: int = 640, height: int = 480) -> np.ndarray:
@@ -278,13 +283,19 @@ class OpenCVDualCameraSource:
     """Persistent role-safe camera session; frames are returned as RGB."""
 
     def __init__(self, camera_config: str | Path, warmup_frames: int = 8):
-        self.registry = load_camera_registry(camera_config)
+        self.camera_config = Path(camera_config)
+        self.registry = load_camera_registry(self.camera_config)
         self.warmup_frames = int(warmup_frames)
         self._captures: dict[str, cv2.VideoCapture] = {}
 
     def connect(self) -> None:
         if self._captures:
             raise RuntimeError("Camera source is already connected")
+        # Re-probe and require a fresh two-view confirmation immediately before
+        # opening the long-lived streams.  Registration-time indices alone are
+        # not trusted after an identical-camera reconnect.
+        require_dual_camera_ready(self.camera_config)
+        self.registry = load_camera_registry(self.camera_config)
         try:
             for role in CAMERA_ROLES:
                 entry = self.registry["roles"].get(role)
@@ -383,9 +394,19 @@ class RealSO101Adapter:
     def _assert_mode_gate(self) -> None:
         if self.mode != "active":
             return
-        if self.config.require_preflight and not self.preflight_report.get("motion_authorized"):
-            raise RuntimeError("Active mode blocked: real-workspace preflight is not authorized")
-        if self.config.require_verified_mapping and not self.config.mapping_verified:
+        if not self.safety_limits.fully_configured or not self.safety_limits.layout_id:
+            raise RuntimeError(
+                "Active mode blocked: all six absolute joint envelopes and layout_id "
+                "must be configured"
+            )
+        try:
+            validate_motion_authorization_report(
+                self.preflight_report,
+                expected_layout_id=self.safety_limits.layout_id,
+            )
+        except ValueError as exc:
+            raise RuntimeError(f"Active mode blocked: {exc}") from exc
+        if not self.config.mapping_verified:
             missing = [
                 name for name in JOINT_NAMES
                 if not self.config.joint_mappings[name].verified_on_physical_robot
@@ -412,8 +433,10 @@ class RealSO101Adapter:
             self.cameras.connect()
             self._connected = True
             self._refresh_observation()
-            shoulder = self._latest_robot_observation[SHOULDER_PAN_KEY]
-            assert_position_within_limits(shoulder, self.safety_limits)
+            if self.mode == "active":
+                assert_positions_within_limits(
+                    self._latest_robot_observation, self.safety_limits
+                )
         except Exception:
             self.cameras.disconnect()
             self._disconnect_robot()
@@ -519,8 +542,8 @@ class RealSO101Adapter:
         sent_action = None
         if self.mode == "active":
             self._assert_mode_gate()
-            current_pan = float(self.robot.bus.sync_read("Present_Position")["shoulder_pan"])
-            assert_position_within_limits(current_pan, self.safety_limits)
+            current = self.robot.bus.sync_read("Present_Position")
+            assert_positions_within_limits(current, self.safety_limits)
             sent_action = {
                 key: float(value)
                 for key, value in self.robot.send_action(absolute_safe).items()

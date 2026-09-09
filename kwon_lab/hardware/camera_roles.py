@@ -1,13 +1,14 @@
 """Role-safe OpenCV camera registration for wrist + overhead RGB."""
 
+import hashlib
 import json
 import platform
 import shutil
 import subprocess
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import cv2
-
 
 CAMERA_ROLES = ("wrist", "overhead")
 BACKEND_IDS = {
@@ -15,6 +16,101 @@ BACKEND_IDS = {
     "dshow": cv2.CAP_DSHOW,
     "msmf": cv2.CAP_MSMF,
 }
+DEFAULT_VIEW_CONFIRMATION_MAX_AGE_S = 5 * 60
+
+
+def _inventory_fingerprint(payload, devices):
+    """Bind a visual role confirmation to the current registry and PnP inventory."""
+    role_state = []
+    for role in CAMERA_ROLES:
+        entry = payload.get("roles", {}).get(role) or {}
+        role_state.append(
+            {
+                "role": role,
+                "index": entry.get("index"),
+                "device_instance_id": str(entry.get("device_instance_id", "")).casefold(),
+                "physical_usb_port": entry.get("physical_usb_port"),
+            }
+        )
+    device_state = sorted(
+        str(item.get("device_instance_id", "")).casefold()
+        for item in devices.get("devices", [])
+        if item.get("device_instance_id")
+    )
+    encoded = json.dumps(
+        {"roles": role_state, "present_device_ids": device_state},
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def create_session_view_confirmation(payload, devices, *, confirmed_at=None):
+    """Create a short-lived attestation after both live views were inspected."""
+    if not devices.get("supported"):
+        raise ValueError("Windows PnP camera inventory is required for session confirmation")
+    return {
+        "confirmed_at": (
+            confirmed_at or datetime.now().astimezone()
+        ).isoformat(timespec="seconds"),
+        "inventory_fingerprint": _inventory_fingerprint(payload, devices),
+        "role_indices": {
+            role: payload["roles"][role]["index"] for role in CAMERA_ROLES
+        },
+        "confirmation": "user_visually_confirmed_current_session",
+    }
+
+
+def session_view_confirmation_status(payload, devices, *, now=None):
+    confirmation = payload.get("session_view_confirmation")
+    result = {"valid": False, "reason": "missing", "age_s": None}
+    if not isinstance(confirmation, dict):
+        return result
+    if confirmation.get("confirmation") != "user_visually_confirmed_current_session":
+        result["reason"] = "invalid_token"
+        return result
+    raw = confirmation.get("confirmed_at")
+    if not isinstance(raw, str):
+        result["reason"] = "missing_timestamp"
+        return result
+    try:
+        confirmed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        result["reason"] = "invalid_timestamp"
+        return result
+    if confirmed.tzinfo is None:
+        result["reason"] = "timestamp_without_timezone"
+        return result
+    current = now or datetime.now().astimezone()
+    age = current.astimezone(confirmed.tzinfo) - confirmed
+    result["age_s"] = age.total_seconds()
+    max_age_s = payload.get("startup_policy", {}).get(
+        "view_confirmation_max_age_s", DEFAULT_VIEW_CONFIRMATION_MAX_AGE_S
+    )
+    if isinstance(max_age_s, bool) or not isinstance(max_age_s, (int, float)) or max_age_s <= 0:
+        result["reason"] = "invalid_max_age"
+        return result
+    if age < timedelta(seconds=-60):
+        result["reason"] = "future_timestamp"
+        return result
+    if age > timedelta(seconds=float(max_age_s)):
+        result["reason"] = "expired"
+        return result
+    if not devices.get("supported"):
+        result["reason"] = "pnp_inventory_unavailable"
+        return result
+    if confirmation.get("inventory_fingerprint") != _inventory_fingerprint(payload, devices):
+        result["reason"] = "registry_or_device_inventory_changed"
+        return result
+    expected_indices = {
+        role: (payload.get("roles", {}).get(role) or {}).get("index")
+        for role in CAMERA_ROLES
+    }
+    if confirmation.get("role_indices") != expected_indices:
+        result["reason"] = "role_indices_changed"
+        return result
+    result.update({"valid": True, "reason": None})
+    return result
 
 
 def capture_camera_frame(index, backend="dshow", width=1280, height=720, warmup=8):
@@ -143,6 +239,21 @@ def load_camera_registry(path):
         raise ValueError("Wrist and overhead roles cannot use the same camera index")
     if len(device_ids) != len(set(device_ids)):
         raise ValueError("Wrist and overhead roles cannot use the same PnP device")
+    startup_policy = payload.get("startup_policy")
+    if not isinstance(startup_policy, dict):
+        raise ValueError("Camera-role config must contain startup_policy")
+    for field in (
+        "require_distinct_indices",
+        "require_view_confirmation_after_usb_change",
+        "block_robot_motion_when_incomplete",
+    ):
+        if startup_policy.get(field) is not True:
+            raise ValueError(f"startup_policy.{field} must remain true")
+    max_age = startup_policy.get(
+        "view_confirmation_max_age_s", DEFAULT_VIEW_CONFIRMATION_MAX_AGE_S
+    )
+    if isinstance(max_age, bool) or not isinstance(max_age, (int, float)) or max_age <= 0:
+        raise ValueError("startup_policy.view_confirmation_max_age_s must be positive")
     return payload
 
 
@@ -166,6 +277,10 @@ def camera_registry_status(path, probe=True, include_devices=True):
     require_identity = payload.get("startup_policy", {}).get(
         "require_view_confirmation_after_usb_change", True
     )
+    session_confirmation = session_view_confirmation_status(payload, devices)
+    status["session_view_confirmation"] = session_confirmation
+    if require_identity and not session_confirmation["valid"]:
+        status["dual_camera_ready"] = False
     for role in CAMERA_ROLES:
         entry = payload["roles"].get(role)
         if entry is None:
@@ -222,6 +337,11 @@ def require_dual_camera_ready(path):
     status = camera_registry_status(path, probe=True)
     if not status["dual_camera_ready"]:
         reasons = []
+        if not status.get("session_view_confirmation", {}).get("valid"):
+            reasons.append(
+                "session_view_confirmation="
+                + str(status.get("session_view_confirmation", {}).get("reason"))
+            )
         for role, item in status["roles"].items():
             if not item["registered"]:
                 reasons.append(f"{role}=not_registered")

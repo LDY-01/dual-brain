@@ -1,0 +1,77 @@
+name: Pre-merge checks
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-and-safety-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install lightweight contract-test dependencies
+        run: python -m pip install "numpy>=2.0" "opencv-python-headless>=4.10" "mujoco>=3.3"
+
+      - name: Check Python syntax, tracked JSON, and Markdown links
+        shell: bash
+        run: |
+          python -m compileall -q kwon_lab scripts
+          python - <<'PY'
+          import json
+          import re
+          import subprocess
+          from pathlib import Path
+          from urllib.parse import unquote
+
+          paths = subprocess.check_output(
+              ["git", "ls-files", "*.json"], text=True
+          ).splitlines()
+          for raw in paths:
+              json.loads(Path(raw).read_text(encoding="utf-8"))
+          print(f"parsed_json={len(paths)}")
+
+          markdown = subprocess.check_output(
+              ["git", "ls-files", "*.md"], text=True
+          ).splitlines()
+          missing = []
+          pattern = re.compile(r"!?\[[^\]]+\]\(([^)]+)\)")
+          for raw in markdown:
+              source = Path(raw)
+              for target in pattern.findall(source.read_text(encoding="utf-8")):
+                  target = target.strip().strip("<>")
+                  if target.startswith(("http://", "https://", "#", "mailto:")):
+                      continue
+                  candidate = unquote(target.split("#", 1)[0])
+                  if candidate and not (source.parent / candidate).exists():
+                      missing.append(f"{raw}: {target}")
+          if missing:
+              raise SystemExit("Missing Markdown links:\n" + "\n".join(missing))
+          print(f"checked_markdown={len(markdown)}")
+          PY
+
+      - name: Run fail-closed hardware self-tests
+        env:
+          PYTHONPATH: kwon_lab
+        run: |
+          python kwon_lab/tools/register_real_cameras.py --self-test
+          python kwon_lab/tools/real_workspace_preflight.py --self-test
+          python kwon_lab/tools/real_policy_shadow.py --self-test --adapter-config config/real_robot_adapter.example.json
+
+      - name: Run S6 registry contract test
+        env:
+          PYTHONPATH: kwon_lab
+        run: python kwon_lab/tools/skill_registry_bench.py
+
+      - name: Check patch whitespace
+        run: git diff --check origin/${{ github.base_ref }}...HEAD

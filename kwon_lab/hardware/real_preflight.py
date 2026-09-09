@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 import json
+from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Mapping
 
 import numpy as np
 
 from hardware.camera_roles import camera_registry_status, load_camera_registry
 from hardware.joint_safety import load_safety_limits
-
 
 REQUIRED_PLANES = ("target_table", "upright_top_6cm", "tipped_top_4cm")
 REQUIRED_OPERATOR_CHECKS = (
@@ -22,6 +22,95 @@ REQUIRED_OPERATOR_CHECKS = (
     "emergency_stop_ready",
     "camera_views_visually_confirmed",
 )
+PREFLIGHT_MAX_AGE_S = 15 * 60
+
+
+def required_preflight_check_names():
+    return {
+        "workspace_profile",
+        "table_surface",
+        *(f"operator:{name}" for name in REQUIRED_OPERATOR_CHECKS),
+        "dual_camera_ready",
+        "joint_absolute_limits",
+        "overhead_calibration",
+    }
+
+
+def validate_motion_authorization_report(
+    report: Mapping[str, object],
+    *,
+    expected_layout_id: str,
+    max_age_s: float = PREFLIGHT_MAX_AGE_S,
+    now: datetime | None = None,
+):
+    """Validate that an active-mode authorization is current and complete."""
+    if not isinstance(report, Mapping):
+        raise ValueError("Preflight report must be an object")
+    if report.get("format_version") != 1:
+        raise ValueError("Preflight report has an unsupported format_version")
+    if report.get("layout_id") != expected_layout_id:
+        raise ValueError(
+            "Preflight layout_id does not match the active safety envelope "
+            f"({report.get('layout_id')!r} != {expected_layout_id!r})"
+        )
+    if report.get("motion_authorized") is not True:
+        raise ValueError("Preflight report does not authorize robot motion")
+
+    checked_at_raw = report.get("checked_at")
+    if not isinstance(checked_at_raw, str):
+        raise ValueError("Preflight report checked_at is missing")
+    try:
+        checked_at = datetime.fromisoformat(checked_at_raw.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ValueError("Preflight report checked_at is invalid") from exc
+    if checked_at.tzinfo is None:
+        raise ValueError("Preflight report checked_at must include a timezone")
+    current = now or datetime.now().astimezone()
+    if current.tzinfo is None:
+        raise ValueError("Preflight validation clock must include a timezone")
+    age = current.astimezone(checked_at.tzinfo) - checked_at
+    if age < timedelta(seconds=-60):
+        raise ValueError("Preflight report timestamp is unexpectedly in the future")
+    if age > timedelta(seconds=float(max_age_s)):
+        raise ValueError(
+            f"Preflight report is stale ({age.total_seconds():.0f}s > {max_age_s:.0f}s)"
+        )
+
+    checks = report.get("checks")
+    if not isinstance(checks, list) or not checks:
+        raise ValueError("Preflight report checks are missing")
+    by_name = {}
+    for item in checks:
+        if not isinstance(item, Mapping) or not isinstance(item.get("name"), str):
+            raise ValueError("Preflight report contains an invalid check")
+        if not isinstance(item.get("passed"), bool) or not isinstance(
+            item.get("blocking"), bool
+        ):
+            raise ValueError("Preflight check passed/blocking fields must be boolean")
+        if item["name"] in by_name:
+            raise ValueError(f"Preflight report contains duplicate check {item['name']!r}")
+        by_name[item["name"]] = item
+    required = required_preflight_check_names()
+    missing = sorted(required - set(by_name))
+    if missing:
+        raise ValueError(f"Preflight report is missing required checks: {missing}")
+    invalid_required = sorted(
+        name
+        for name in required
+        if by_name[name]["blocking"] is not True or by_name[name]["passed"] is not True
+    )
+    if invalid_required:
+        raise ValueError(
+            "Preflight required checks must be blocking and passed: "
+            f"{invalid_required}"
+        )
+    failed = sorted(
+        name for name, item in by_name.items()
+        if item["blocking"] and not item["passed"]
+    )
+    if failed:
+        raise ValueError(f"Preflight report has failed blocking checks: {failed}")
+    return True
 
 
 def _read_json(path):
@@ -225,19 +314,25 @@ def evaluate_real_preflight(
         layout_matches = layout_id is not None and safety_layout == layout_id
         checks.append(
             _check(
-                "shoulder_pan_limit",
-                layout_matches,
+                "joint_absolute_limits",
+                layout_matches and limits.fully_configured,
                 {
-                    "configured": True,
+                    "configured": limits.fully_configured,
                     "layout_id": safety_layout,
                     "workspace_layout_id": layout_id,
-                    "min_deg": limits.shoulder_pan.min_deg,
-                    "max_deg": limits.shoulder_pan.max_deg,
+                    "joints": {
+                        name: {
+                            "min_deg": limit.min_deg,
+                            "max_deg": limit.max_deg,
+                            "verified_collision_free": limit.verified_collision_free,
+                        }
+                        for name, limit in limits.joints.items()
+                    },
                 },
             )
         )
     except (OSError, ValueError, json.JSONDecodeError) as exc:
-        checks.append(_check("shoulder_pan_limit", False, str(exc)))
+        checks.append(_check("joint_absolute_limits", False, str(exc)))
 
     try:
         overhead_entry = registry["roles"].get("overhead") if registry else None

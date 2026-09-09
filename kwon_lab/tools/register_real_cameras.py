@@ -3,7 +3,8 @@
 import argparse
 import json
 import sys
-from datetime import datetime
+import tempfile
+from datetime import datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -12,11 +13,12 @@ from hardware.camera_roles import (
     CAMERA_ROLES,
     camera_registry_status,
     capture_camera_frame,
+    create_session_view_confirmation,
     enumerate_windows_camera_devices,
     load_camera_registry,
     probe_camera,
+    session_view_confirmation_status,
 )
-
 
 DEFAULT_CONFIG = Path("config/real_camera_roles.local.json")
 
@@ -28,6 +30,7 @@ def empty_registry():
         "startup_policy": {
             "require_distinct_indices": True,
             "require_view_confirmation_after_usb_change": True,
+            "view_confirmation_max_age_s": 300,
             "block_robot_motion_when_incomplete": True,
         },
     }
@@ -38,6 +41,71 @@ def save_registry(path, payload):
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
+def run_self_test():
+    now = datetime.now().astimezone()
+    payload = empty_registry()
+    payload["roles"] = {
+        "wrist": {
+            "index": 1,
+            "device_instance_id": "USB\\CAMERA_A",
+            "physical_usb_port": "left",
+            "confirmation": "user_visually_confirmed",
+        },
+        "overhead": {
+            "index": 2,
+            "device_instance_id": "USB\\CAMERA_B",
+            "physical_usb_port": "right",
+            "confirmation": "user_visually_confirmed",
+        },
+    }
+    devices = {
+        "supported": True,
+        "devices": [
+            {"device_instance_id": "USB\\CAMERA_A"},
+            {"device_instance_id": "USB\\CAMERA_B"},
+        ],
+    }
+    payload["session_view_confirmation"] = create_session_view_confirmation(
+        payload, devices, confirmed_at=now
+    )
+    valid = session_view_confirmation_status(payload, devices, now=now)["valid"]
+    changed = json.loads(json.dumps(payload))
+    changed["roles"]["wrist"]["index"] = 3
+    changed_registry_blocked = not session_view_confirmation_status(
+        changed, devices, now=now
+    )["valid"]
+    changed_devices = {
+        "supported": True,
+        "devices": devices["devices"] + [{"device_instance_id": "USB\\CAMERA_C"}],
+    }
+    changed_inventory_blocked = not session_view_confirmation_status(
+        payload, changed_devices, now=now
+    )["valid"]
+    expired_blocked = not session_view_confirmation_status(
+        payload, devices, now=now + timedelta(minutes=6)
+    )["valid"]
+    disabled_policy = json.loads(json.dumps(payload))
+    disabled_policy["startup_policy"]["require_view_confirmation_after_usb_change"] = False
+    disabled_policy_blocked = False
+    with tempfile.TemporaryDirectory() as folder:
+        candidate = Path(folder) / "camera.json"
+        save_registry(candidate, disabled_policy)
+        try:
+            load_camera_registry(candidate)
+        except ValueError:
+            disabled_policy_blocked = True
+    report = {
+        "current_session_confirmation_valid": valid,
+        "changed_role_index_blocked": changed_registry_blocked,
+        "changed_device_inventory_blocked": changed_inventory_blocked,
+        "expired_confirmation_blocked": expired_blocked,
+        "disabled_startup_policy_blocked": disabled_policy_blocked,
+    }
+    report["passed"] = all(report.values())
+    print(json.dumps(report, indent=2))
+    return report["passed"]
+
+
 def main():
     parser = argparse.ArgumentParser()
     action = parser.add_mutually_exclusive_group(required=True)
@@ -46,6 +114,8 @@ def main():
     action.add_argument("--status", action="store_true")
     action.add_argument("--register-role", choices=CAMERA_ROLES)
     action.add_argument("--clear-role", choices=CAMERA_ROLES)
+    action.add_argument("--confirm-session", action="store_true")
+    action.add_argument("--self-test", action="store_true")
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
     parser.add_argument("--camera-index", type=int)
     parser.add_argument("--max-index", type=int, default=5)
@@ -66,7 +136,14 @@ def main():
         "--confirm-view",
         help="For registration, type WRIST or OVERHEAD after visually checking the feed.",
     )
+    parser.add_argument(
+        "--confirm-both-views",
+        help="For session confirmation, type WRIST_OVERHEAD after checking current snapshots.",
+    )
     args = parser.parse_args()
+
+    if args.self_test:
+        raise SystemExit(0 if run_self_test() else 1)
 
     if args.devices:
         print(json.dumps(enumerate_windows_camera_devices(), indent=2))
@@ -116,8 +193,38 @@ def main():
         if args.config.exists()
         else empty_registry()
     )
+    if args.confirm_session:
+        if args.confirm_both_views != "WRIST_OVERHEAD":
+            raise SystemExit(
+                "Refusing confirmation: inspect both current feeds and pass "
+                "--confirm-both-views WRIST_OVERHEAD"
+            )
+        status = camera_registry_status(args.config)
+        role_failures = []
+        for role in CAMERA_ROLES:
+            item = status["roles"].get(role, {})
+            if not item.get("registered"):
+                role_failures.append(f"{role}=not_registered")
+            elif not item.get("available"):
+                role_failures.append(f"{role}=unavailable")
+            elif item.get("pnp_device_present") is not True:
+                role_failures.append(f"{role}=pnp_identity_missing")
+            elif not item.get("device_identity_complete"):
+                role_failures.append(f"{role}=identity_incomplete")
+        devices = status["windows_camera_devices"]
+        if not devices.get("supported"):
+            role_failures.append("windows_pnp_inventory=unavailable")
+        if role_failures:
+            raise SystemExit("Cannot confirm camera session: " + ", ".join(role_failures))
+        payload["session_view_confirmation"] = create_session_view_confirmation(
+            payload, devices
+        )
+        save_registry(args.config, payload)
+        print(json.dumps(camera_registry_status(args.config), indent=2))
+        return
     if args.clear_role:
         payload["roles"][args.clear_role] = None
+        payload.pop("session_view_confirmation", None)
         save_registry(args.config, payload)
         print(f"Cleared {args.clear_role} registration in {args.config}")
         return
@@ -176,6 +283,7 @@ def main():
         "registered_at": datetime.now().astimezone().isoformat(timespec="seconds"),
         "confirmation": "user_visually_confirmed",
     }
+    payload.pop("session_view_confirmation", None)
     save_registry(args.config, payload)
     print(json.dumps(camera_registry_status(args.config), indent=2))
 

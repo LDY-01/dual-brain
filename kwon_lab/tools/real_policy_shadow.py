@@ -4,25 +4,33 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import replace
-from datetime import datetime
 import json
-from pathlib import Path
 import sys
 import tempfile
 import time
+from dataclasses import replace
+from datetime import datetime
+from pathlib import Path
 
 import cv2
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from hardware.real_preflight import evaluate_real_preflight
-from hardware.joint_safety import JointLimit, SafetyLimits, load_safety_limits
+from hardware.joint_safety import (
+    JointLimit,
+    SafetyLimits,
+    enforce_action_limits,
+    load_safety_limits,
+    unbounded_safety_limits,
+)
+from hardware.real_preflight import (
+    evaluate_real_preflight,
+    required_preflight_check_names,
+)
 from hardware.real_so101_adapter import (
-    ACTPolicySession,
-    JOINT_KEYS,
     JOINT_NAMES,
+    ACTPolicySession,
     JointMapping,
     OpenCVDualCameraSource,
     RealSO101Adapter,
@@ -167,7 +175,40 @@ def run_self_test(adapter_config):
     robot_observation = policy_action_to_robot(initial_policy, config)
     recovered = robot_state_to_policy(robot_observation, config)
     image = prepare_policy_image(np.zeros((720, 1280, 3), dtype=np.uint8))
-    safety = SafetyLimits(JointLimit(-45.0, 30.0), Path("self_test"))
+    layout_id = "self_test_layout"
+    safety = SafetyLimits(
+        {
+            name: JointLimit(-180.0, 180.0, True)
+            for name in JOINT_NAMES
+        }
+        | {"shoulder_pan": JointLimit(-45.0, 30.0, True)},
+        Path("self_test"),
+        layout_id,
+    )
+
+    def valid_preflight():
+        return {
+            "format_version": 1,
+            "checked_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+            "layout_id": layout_id,
+            "motion_authorized": True,
+            "checks": [
+                {"name": name, "passed": True, "blocking": True, "detail": "self_test"}
+                for name in sorted(required_preflight_check_names())
+            ],
+        }
+
+    all_joint_probe = {f"{name}.pos": 0.0 for name in JOINT_NAMES}
+    all_joint_probe["shoulder_lift.pos"] = 250.0
+    all_joint_safe, all_joint_interventions = enforce_action_limits(
+        all_joint_probe, safety
+    )
+    non_pan_absolute_limit_applied = (
+        all_joint_safe["shoulder_lift.pos"] == 180.0
+        and any(
+            item["joint"] == "shoulder_lift" for item in all_joint_interventions
+        )
+    )
 
     with tempfile.TemporaryDirectory() as folder:
         audit = Path(folder) / "shadow.jsonl"
@@ -230,7 +271,7 @@ def run_self_test(adapter_config):
                 robot=_FakeRobot(robot_observation),
                 cameras=_FakeCameras(),
                 safety_limits=safety,
-                preflight_report={"motion_authorized": True},
+                preflight_report=valid_preflight(),
                 active_confirmation=config.confirmation_token,
             )
         except RuntimeError:
@@ -256,7 +297,7 @@ def run_self_test(adapter_config):
                 robot=_FakeRobot(robot_observation),
                 cameras=_FakeCameras(),
                 safety_limits=safety,
-                preflight_report={"motion_authorized": True},
+                preflight_report=valid_preflight(),
                 active_confirmation=None,
             )
         except RuntimeError:
@@ -267,13 +308,52 @@ def run_self_test(adapter_config):
             robot=active_robot,
             cameras=_FakeCameras(),
             safety_limits=safety,
-            preflight_report={"motion_authorized": True},
+            preflight_report=valid_preflight(),
             active_confirmation=verified_config.confirmation_token,
         )
         with active:
             active.step(np.array([1.2, -0.4, 0.7, 0.9, 0.1, 1.0]))
         active_sent_once = len(active_robot.send_calls) == 1 and active.goal_position_writes == 1
         pan_was_clamped = active_robot.send_calls[0]["shoulder_pan.pos"] <= 5.0
+
+        disabled_required_gates_blocked = False
+        try:
+            RealSO101Adapter(
+                replace(
+                    verified_config,
+                    require_preflight=False,
+                    require_verified_mapping=False,
+                ),
+                mode="active",
+                robot=_FakeRobot(robot_observation),
+                cameras=_FakeCameras(),
+                safety_limits=safety,
+                preflight_report=valid_preflight(),
+                active_confirmation=verified_config.confirmation_token,
+            )
+        except ValueError:
+            disabled_required_gates_blocked = True
+
+        stale_wrong_layout_preflight_blocked = False
+        invalid_preflight = valid_preflight()
+        invalid_preflight.update(
+            {
+                "checked_at": "2000-01-01T00:00:00+09:00",
+                "layout_id": "wrong_layout",
+            }
+        )
+        try:
+            RealSO101Adapter(
+                verified_config,
+                mode="active",
+                robot=_FakeRobot(robot_observation),
+                cameras=_FakeCameras(),
+                safety_limits=safety,
+                preflight_report=invalid_preflight,
+                active_confirmation=verified_config.confirmation_token,
+            )
+        except RuntimeError:
+            stale_wrong_layout_preflight_blocked = True
 
     report = {
         "mapping_round_trip_max_error": float(np.max(np.abs(recovered - initial_policy))),
@@ -293,6 +373,9 @@ def run_self_test(adapter_config):
         "active_without_confirmation_blocked": active_without_confirmation_blocked,
         "active_verified_path_sent_once": active_sent_once,
         "active_relative_pan_clamp_applied": pan_was_clamped,
+        "disabled_required_gates_blocked": disabled_required_gates_blocked,
+        "stale_wrong_layout_preflight_blocked": stale_wrong_layout_preflight_blocked,
+        "non_pan_absolute_limit_applied": non_pan_absolute_limit_applied,
     }
     report["passed"] = bool(
         report["mapping_round_trip_max_error"] < 1e-12
@@ -307,6 +390,9 @@ def run_self_test(adapter_config):
         and active_without_confirmation_blocked
         and active_sent_once
         and pan_was_clamped
+        and disabled_required_gates_blocked
+        and stale_wrong_layout_preflight_blocked
+        and non_pan_absolute_limit_applied
     )
     print(json.dumps(report, indent=2))
     return report["passed"]
@@ -374,7 +460,7 @@ def main():
         # Shadow never dispatches the action, so it remains useful before the
         # new-site physical pan boundary is measured. The missing guard stays
         # visible in both preflight and the summary and still blocks active mode.
-        safety = SafetyLimits(JointLimit(None, None), args.safety_config.resolve())
+        safety = unbounded_safety_limits(args.safety_config.resolve())
         safety_config_available = False
     stamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S")
     output = args.output_root / stamp

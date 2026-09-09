@@ -37,3 +37,9 @@ uv run python -m kwon_lab.tools.capture_shoulder_pan_limit `
    기둥과 여유가 충분한지 육안으로 확인한다.
 
 실물 배치나 카메라 기둥 위치를 바꾸면 기존 값은 폐기하고 다시 측정해야 한다.
+
+## 나머지 관절의 절대 작업 범위
+
+숄더팬 한계는 기둥 방향의 특수 측정이다. 이것만으로는 반복된 5도 명령이 shoulder_lift, elbow_flex, wrist_flex, wrist_roll 또는 gripper를 누적해서 테이블·본체·케이블 쪽으로 보내는 것을 막지 못한다. 따라서 능동 모드에는 `config/real_robot_safety_limits.local.json`의 여섯 관절 모두에 검증된 `min_deg`, `max_deg`, `verified_collision_free=true`가 필요하다.
+
+나머지 범위는 자동으로 추정해 저장하지 않는다. 그림자 모드에서 나온 제안 범위를 먼저 확인하고, 12V 차단 준비와 저속 감독 아래 전체 픽앤플레이스 경로가 충돌하지 않는 보수적 범위만 기록한다. 하나라도 비어 있거나 현재 자세가 범위 밖이면 능동 동작은 실패 폐쇄된다.

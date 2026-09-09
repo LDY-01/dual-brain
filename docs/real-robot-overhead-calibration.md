@@ -45,7 +45,7 @@ $env:PYTHONPATH='kwon_lab'
   --confirm-view OVERHEAD
 ```
 
-손목과 상단에 같은 index를 등록하면 도구가 거부한다. 향후 실물 제어 시작부는 `require_dual_camera_ready()`를 호출해 두 카메라가 모두 등록되고 실제 프레임을 반환할 때만 모터 동작을 허용한다.
+손목과 상단에 같은 index를 등록하면 도구가 거부한다. 등록만으로는 준비 완료가 아니다. 두 카메라가 같은 U20CAM이므로 현재 `--probe` 스냅샷에서 역할을 다시 보고 `--confirm-session --confirm-both-views WRIST_OVERHEAD`를 실행해야 한다. 이 확인은 5분 뒤 또는 index·PnP 장치 목록·등록 변경 시 무효화된다. 실물 스트림을 열기 직전에 `require_dual_camera_ready()`가 등록, 현재 프레임, 장치 목록과 세션 확인을 다시 검사한다.
 
 ## 기준점 표시
 

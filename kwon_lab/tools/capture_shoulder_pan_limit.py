@@ -15,8 +15,8 @@ from pathlib import Path
 from lerobot.robots.so_follower import SO101Follower
 from lerobot.robots.so_follower.config_so_follower import SO101FollowerConfig
 
-
 DEFAULT_OUTPUT = Path("config/real_robot_safety_limits.local.json")
+OTHER_JOINTS = ("shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll", "gripper")
 
 
 def parse_args() -> argparse.Namespace:
@@ -64,10 +64,20 @@ def build_payload(args: argparse.Namespace, measured_deg: float, blocked_directi
                 "blocked_encoder_direction": blocked_direction,
                 "measured_clear_boundary_deg": round(measured_deg, 3),
                 "safety_margin_deg": args.margin_deg,
-            }
+                "verified_collision_free": True,
+            },
+            **{
+                name: {
+                    "min_deg": None,
+                    "max_deg": None,
+                    "verified_collision_free": False,
+                }
+                for name in OTHER_JOINTS
+            },
         },
         "enforcement": {
             "fail_if_unconfigured": True,
+            "require_all_joint_envelopes_verified": True,
             "max_relative_target_deg": 5.0,
         },
     }
@@ -80,7 +90,10 @@ def main() -> None:
     if args.clearance_cm < 5:
         raise SystemExit("Keep at least 5 cm of visible clearance from the pillar")
 
-    print("No automatic movement will be commanded. Connecting only to read the encoder.")
+    print(
+        "No automatic movement will be commanded. The only motor-register write is "
+        "Torque_Enable=off for safe manual positioning."
+    )
     robot = SO101Follower(
         SO101FollowerConfig(
             port=args.port,
@@ -90,7 +103,10 @@ def main() -> None:
             max_relative_target=5.0,
         )
     )
-    robot.connect(calibrate=False)
+    # Avoid SO101Follower.connect(), which also configures registers.  This
+    # commissioning tool needs only the calibrated read bus plus the explicit
+    # torque-disable write required for safe manual positioning.
+    robot.bus.connect()
     try:
         robot.bus.disable_torque()
         blocked_direction = args.blocked_direction
@@ -122,9 +138,16 @@ def main() -> None:
         observation = robot.get_observation()
         measured = float(observation["shoulder_pan.pos"])
     finally:
-        robot.disconnect()
+        robot.bus.disconnect(False)
 
     payload = build_payload(args, measured, blocked_direction)
+    if args.output.is_file():
+        existing = json.loads(args.output.read_text(encoding="utf-8"))
+        if existing.get("layout_id") == args.layout_id:
+            for name in OTHER_JOINTS:
+                entry = existing.get("joints", {}).get(name)
+                if isinstance(entry, dict):
+                    payload["joints"][name] = entry
     print(json.dumps(payload, indent=2, ensure_ascii=False))
     if not args.save:
         print("Read only; no file was written. Add --save after checking the direction and value.")

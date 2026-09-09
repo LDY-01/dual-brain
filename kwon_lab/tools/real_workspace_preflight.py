@@ -5,13 +5,16 @@ from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
 import sys
 import tempfile
+from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from hardware.real_preflight import evaluate_real_preflight
+from hardware.real_preflight import (
+    evaluate_real_preflight,
+    validate_motion_authorization_report,
+)
 
 
 def _write(path, payload):
@@ -32,12 +35,30 @@ def run_self_test():
                 "wrist": {"index": 1, "backend": "dshow"},
                 "overhead": {"index": 2, "backend": "dshow"},
             },
+            "startup_policy": {
+                "require_distinct_indices": True,
+                "require_view_confirmation_after_usb_change": True,
+                "view_confirmation_max_age_s": 300,
+                "block_robot_motion_when_incomplete": True,
+            },
         })
         _write(safety, {
             "format_version": 1,
             "units": "degrees",
             "layout_id": layout_id,
-            "joints": {"shoulder_pan": {"min_deg": -90.0, "max_deg": 45.0}},
+            "joints": {
+                "shoulder_pan": {"min_deg": -90.0, "max_deg": 45.0, "verified_collision_free": True},
+                "shoulder_lift": {"min_deg": -90.0, "max_deg": 90.0, "verified_collision_free": True},
+                "elbow_flex": {"min_deg": -90.0, "max_deg": 90.0, "verified_collision_free": True},
+                "wrist_flex": {"min_deg": -90.0, "max_deg": 90.0, "verified_collision_free": True},
+                "wrist_roll": {"min_deg": -90.0, "max_deg": 90.0, "verified_collision_free": True},
+                "gripper": {"min_deg": -10.0, "max_deg": 100.0, "verified_collision_free": True},
+            },
+            "enforcement": {
+                "fail_if_unconfigured": True,
+                "require_all_joint_envelopes_verified": True,
+                "max_relative_target_deg": 5.0,
+            },
         })
         matrix = [[0.001, 0, -0.4], [0, -0.001, 0.36], [0, 0, 1]]
         _write(calibration, {
@@ -91,6 +112,19 @@ def run_self_test():
             probe_cameras=False,
             camera_status_override=camera_status,
         )
+        safety_payload = json.loads(safety.read_text(encoding="utf-8"))
+        safety_payload["joints"]["gripper"]["verified_collision_free"] = False
+        _write(safety, safety_payload)
+        incomplete_joint_envelope = evaluate_real_preflight(
+            camera,
+            safety,
+            calibration,
+            workspace,
+            probe_cameras=False,
+            camera_status_override=camera_status,
+        )
+        safety_payload["joints"]["gripper"]["verified_collision_free"] = True
+        _write(safety, safety_payload)
         oversized_workspace_payload = {
             "format_version": 1,
             "layout_id": layout_id,
@@ -143,11 +177,40 @@ def run_self_test():
             probe_cameras=False,
             camera_status_override=camera_status,
         )
+        valid_report_accepted = validate_motion_authorization_report(
+            passed, expected_layout_id=layout_id
+        )
+        stale_report = dict(passed)
+        stale_report["checked_at"] = "2000-01-01T00:00:00+09:00"
+        stale_report_blocked = False
+        try:
+            validate_motion_authorization_report(
+                stale_report, expected_layout_id=layout_id
+            )
+        except ValueError:
+            stale_report_blocked = True
+        nonblocking_required_report = json.loads(json.dumps(passed))
+        nonblocking_required_report["checks"][0]["blocking"] = False
+        nonblocking_required_report_blocked = False
+        try:
+            validate_motion_authorization_report(
+                nonblocking_required_report, expected_layout_id=layout_id
+            )
+        except ValueError:
+            nonblocking_required_report_blocked = True
         report = {
             "valid_setup_authorized": passed["motion_authorized"],
+            "incomplete_joint_envelope_blocked": not incomplete_joint_envelope[
+                "motion_authorized"
+            ],
             "uncovered_workspace_blocked": not uncovered_workspace["motion_authorized"],
             "unmarked_task_workspace_blocked": not unmarked_workspace["motion_authorized"],
             "missing_emergency_stop_blocked": not blocked["motion_authorized"],
+            "valid_report_accepted": valid_report_accepted,
+            "stale_report_blocked": stale_report_blocked,
+            "nonblocking_required_report_blocked": (
+                nonblocking_required_report_blocked
+            ),
         }
         report["passed"] = all(report.values())
         print(json.dumps(report, indent=2))
