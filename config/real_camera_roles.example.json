@@ -1,0 +1,14 @@
+{
+  "format_version": 1,
+  "roles": {
+    "wrist": null,
+    "overhead": null
+  },
+  "startup_policy": {
+    "require_distinct_indices": true,
+    "require_view_confirmation_after_usb_change": true,
+    "view_confirmation_max_age_s": 300,
+    "block_robot_motion_when_incomplete": true
+  },
+  "registration_note": "Store a visually confirmed OpenCV index with the Windows PnP instance ID and physical USB-port label, then create a fresh two-view session confirmation immediately before preflight. Indices alone are not stable."
+}

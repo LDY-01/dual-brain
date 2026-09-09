@@ -5,7 +5,7 @@
 
 - 관측: {"pixels": (H,W,3) uint8 고정 카메라, "agent_pos": (6,) 관절각 rad}
 - 액션: (6,) 목표 관절각 rad — MJCF의 position 액추에이터가 추종
-- 성공: 블록 중심이 목표 구역 중심 4cm 이내
+- 성공: 블록 바닥 면적의 75% 이상이 목표 구역 안에 있고 테이블에 내려놓인 상태
 """
 
 from pathlib import Path
@@ -19,12 +19,55 @@ from gymnasium import spaces
 # 원본 SO-ARM100 모델은 손가락이 볼록 껍질로 계산돼 그랩 불가 (PROJECT.md 결정 기록 참조)
 ASSETS = Path(__file__).parent.parent / "assets" / "menagerie_so101"
 SCENE_XML = ASSETS / "pick_scene.xml"
+REAL_BLOCK_SCENE_XML = ASSETS / "pick_scene_real_block.xml"
 BLOCK_HALF_H = 0.03  # 4x4x6cm 박스 (Menagerie 검증 스펙)
+BLOCK_HALF_SIZE = np.array([0.02, 0.02, 0.03], dtype=float)
+OBJECT_PROFILES = {
+    "legacy_96g": {
+        "scene": SCENE_XML,
+        "mass_kg": 0.096,
+        "friction_range": (1.0, 1.0),
+    },
+    "real_28g": {
+        "scene": REAL_BLOCK_SCENE_XML,
+        "mass_kg": 0.0286,
+        "friction_range": (0.25, 0.8),
+    },
+    "sharp_28g": {
+        "scene": SCENE_XML,
+        "mass_kg": 0.0286,
+        "friction_range": (1.0, 1.0),
+    },
+    "rounded_96g": {
+        "scene": REAL_BLOCK_SCENE_XML,
+        "mass_kg": 0.096,
+        "friction_range": (1.0, 1.0),
+    },
+}
 
 # 블록 스폰 구역 (홈 자세 그리퍼 (0.29, 0) 기준 손 닿는 범위)
 BLOCK_X = (0.18, 0.28)
 BLOCK_Y = (-0.10, 0.10)
-SUCCESS_RADIUS = 0.04  # m
+SUCCESS_COVERAGE = 0.75  # 블록 바닥 면적 중 목표 구역에 포함돼야 하는 비율
+BLOCK_ON_TABLE_Z = 0.05  # 블록 중심이 이보다 낮아야 실제로 내려놓은 것으로 판정
+
+
+def load_mj_model(xml_path):
+    """Load MJCF even when its Windows path contains non-ASCII characters."""
+    path = Path(xml_path).resolve()
+    try:
+        return mujoco.MjModel.from_xml_path(str(path))
+    except ValueError as exc:
+        if "Error opening file" not in str(exc):
+            raise
+        assets = {
+            asset.relative_to(path.parent).as_posix(): asset.read_bytes()
+            for asset in path.parent.rglob("*")
+            if asset.is_file()
+        }
+        return mujoco.MjModel.from_xml_string(
+            path.read_text(encoding="utf-8"), assets=assets
+        )
 
 
 def camera_gravity(model, data, camera_name):
@@ -46,12 +89,48 @@ def upright_k(g):
 class SO101PickEnv(gym.Env):
     metadata = {"render_modes": ["rgb_array"], "render_fps": 25}
 
-    def __init__(self, render_size=(480, 640), control_hz=25, camera="front"):
-        self.model = mujoco.MjModel.from_xml_path(str(SCENE_XML))
+    def __init__(
+        self,
+        render_size=(480, 640),
+        control_hz=25,
+        camera="front",
+        overhead_render_size=(720, 1280),
+        object_profile="real_28g",
+        block_sliding_friction_range=None,
+    ):
+        if object_profile not in OBJECT_PROFILES:
+            raise ValueError(
+                f"Unknown object_profile={object_profile!r}; choose {sorted(OBJECT_PROFILES)}"
+            )
+        profile = OBJECT_PROFILES[object_profile]
+        self.object_profile = object_profile
+        self.block_mass_kg = float(profile["mass_kg"])
+        friction_range = (
+            profile["friction_range"]
+            if block_sliding_friction_range is None
+            else block_sliding_friction_range
+        )
+        if len(friction_range) != 2:
+            raise ValueError("block_sliding_friction_range must contain (min, max)")
+        self.block_sliding_friction_range = tuple(map(float, friction_range))
+        if not 0 < self.block_sliding_friction_range[0] <= self.block_sliding_friction_range[1]:
+            raise ValueError("block sliding-friction range must be positive and ordered")
+
+        self.model = load_mj_model(profile["scene"])
+        initial_block_body = mujoco.mj_name2id(
+            self.model, mujoco.mjtObj.mjOBJ_BODY, "block"
+        )
+        compiled_mass = float(self.model.body_mass[initial_block_body])
+        if not np.isclose(compiled_mass, self.block_mass_kg):
+            mass_scale = self.block_mass_kg / compiled_mass
+            self.model.body_mass[initial_block_body] *= mass_scale
+            self.model.body_inertia[initial_block_body] *= mass_scale
         self.data = mujoco.MjData(self.model)
         self.camera = camera
         h, w = render_size
         self.renderer = mujoco.Renderer(self.model, height=h, width=w)
+        self._overhead_render_size = tuple(overhead_render_size)
+        self._overhead_renderer = None
 
         # 물리 timestep(모델 정의) 대비 제어 주기 → 스텝당 물리 반복 횟수
         self.n_substeps = max(1, int(1.0 / control_hz / self.model.opt.timestep))
@@ -60,7 +139,22 @@ class SO101PickEnv(gym.Env):
             mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, "block_free")
         ]
         self.block_body = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "block")
+        self.block_geom = mujoco.mj_name2id(
+            self.model, mujoco.mjtObj.mjOBJ_GEOM, "block_geom"
+        )
+        self.block_floor_pair = mujoco.mj_name2id(
+            self.model, mujoco.mjtObj.mjOBJ_PAIR, "block_floor_contact"
+        )
+        self.block_sliding_friction = self.block_sliding_friction_range[0]
         self.target_site = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, "target_zone")
+
+        # 블록 바닥 면적의 목표 구역 포함률을 고정 격자로 근사한다. 격자 중심을
+        # 사용해 경계 편향을 줄이고, 블록의 현재 yaw 회전도 반영한다.
+        grid_n = 61
+        axis = (np.arange(grid_n, dtype=float) + 0.5) / grid_n * 2.0 - 1.0
+        gx, gy = np.meshgrid(axis, axis, indexing="xy")
+        self._footprint_grid = np.column_stack([gx.ravel(), gy.ravel()])
+        self._target_radius = float(self.model.site_size[self.target_site, 0])
 
         ctrl = self.model.actuator_ctrlrange  # (6, 2)
         self.action_space = spaces.Box(
@@ -79,10 +173,34 @@ class SO101PickEnv(gym.Env):
         super().reset(seed=seed)
         mujoco.mj_resetData(self.model, self.data)
 
-        # 블록 위치 랜덤화 (yaw도 랜덤)
-        x = self.np_random.uniform(*BLOCK_X)
-        y = self.np_random.uniform(*BLOCK_Y)
-        yaw = self.np_random.uniform(-np.pi, np.pi)
+        # 기본은 블록 위치·yaw 무작위화. 데이터 수집에서는 options로 특정
+        # 위치 구간을 지정할 수 있으며, 일반 reset 동작은 이전과 동일하다.
+        block_pose = (options or {}).get("block_pose")
+        if block_pose is None:
+            x = self.np_random.uniform(*BLOCK_X)
+            y = self.np_random.uniform(*BLOCK_Y)
+            yaw = self.np_random.uniform(-np.pi, np.pi)
+        else:
+            x, y, yaw = map(float, block_pose)
+            if not (BLOCK_X[0] <= x <= BLOCK_X[1]):
+                raise ValueError(f"block x={x} is outside {BLOCK_X}")
+            if not (BLOCK_Y[0] <= y <= BLOCK_Y[1]):
+                raise ValueError(f"block y={y} is outside {BLOCK_Y}")
+
+        # Use a separate deterministic stream for physical randomization so
+        # the same evaluation seed keeps exactly the legacy block XY/yaw.
+        friction_rng = (
+            np.random.default_rng(np.random.SeedSequence([int(seed), 0xB10C]))
+            if seed is not None
+            else self.np_random
+        )
+        self.block_sliding_friction = float(
+            friction_rng.uniform(*self.block_sliding_friction_range)
+        )
+        if self.block_floor_pair >= 0:
+            self.model.pair_friction[self.block_floor_pair, :2] = self.block_sliding_friction
+        else:
+            self.model.geom_friction[self.block_geom, 0] = self.block_sliding_friction
         quat = np.array([np.cos(yaw / 2), 0, 0, np.sin(yaw / 2)])
         self.data.qpos[self.block_qpos_addr : self.block_qpos_addr + 7] = [
             x, y, BLOCK_HALF_H, *quat,
@@ -123,13 +241,27 @@ class SO101PickEnv(gym.Env):
             self._last_step_t = time.time()
 
         info = self._get_info()
-        success = info["dist_to_target"] < SUCCESS_RADIUS
+        success = info["success"]
         reward = 1.0 if success else 0.0
         return self._get_obs(), reward, bool(success), False, info
 
     def render(self):
         self.renderer.update_scene(self.data, camera=self.camera)
         return self.renderer.render()
+
+    def render_overhead(self):
+        """Render the fixed 52 cm overhead U20CAM approximation at 720p."""
+        if self._overhead_renderer is None:
+            h, w = self._overhead_render_size
+            self._overhead_renderer = mujoco.Renderer(self.model, height=h, width=w)
+        self._overhead_renderer.update_scene(self.data, camera="overhead")
+        return self._overhead_renderer.render()
+
+    def close(self):
+        self.renderer.close()
+        if self._overhead_renderer is not None:
+            self._overhead_renderer.close()
+            self._overhead_renderer = None
 
     # ── 내부 ──────────────────────────────────────────────────
 
@@ -145,11 +277,41 @@ class SO101PickEnv(gym.Env):
         """특권 상태 — System 2 피드백과 성공 판정에 사용 (시뮬 전용)."""
         block = self.data.xpos[self.block_body]
         target = self.data.site_xpos[self.target_site]
+        rotation = self.data.xmat[self.block_body].reshape(3, 3)
+        # Use the face whose normal is most vertical.  This preserves the
+        # original 4x4 cm footprint while upright and correctly switches to a
+        # 4x6 cm contact face after the block tips onto its side.
+        normal_axis = int(np.argmax(np.abs(rotation[2, :])))
+        tangent_axes = [axis for axis in range(3) if axis != normal_axis]
+        # Mesh geoms do not expose nominal box half-sizes through geom_size.
+        # Use the measured 40x40x60 mm outer bounds for pose-aware scoring.
+        half_size = BLOCK_HALF_SIZE
+        tangent_vectors = np.column_stack(
+            [
+                rotation[:2, axis] * half_size[axis]
+                for axis in tangent_axes
+            ]
+        )
+        footprint_world = (
+            block[:2]
+            + self._footprint_grid @ tangent_vectors.T
+        )
+        coverage = float(np.mean(
+            np.linalg.norm(footprint_world - target[:2], axis=1) <= self._target_radius
+        ))
+        block_height = float(block[2])
         return {
             "block_pos": block.copy(),
             "target_pos": target.copy(),
             "dist_to_target": float(np.linalg.norm(block[:2] - target[:2])),
-            "block_height": float(block[2]),
+            "target_coverage": coverage,
+            "block_height": block_height,
+            "object_profile": self.object_profile,
+            "block_mass_kg": self.block_mass_kg,
+            "block_sliding_friction": self.block_sliding_friction,
+            "success": bool(
+                coverage >= SUCCESS_COVERAGE and block_height < BLOCK_ON_TABLE_Z
+            ),
             "gripper_pos": self.data.xpos[
                 mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "gripper")
             ].copy(),

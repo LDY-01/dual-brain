@@ -29,6 +29,11 @@
         <light pos="0 0 3.5" dir="0 0 -1" directional="true" diffuse="0.3 0.3 0.3" />
         <!-- 골대 추가 후 시야 확보를 위해 +y측으로 재배치 (2026-08-10) -->
         <camera name="front" pos="0.45 0.45 0.40" xyaxes="-0.914 0.406 0.000 -0.235 -0.529 0.815" />
+        <!-- Innomaker U20CAM-720P fixed overhead camera approximation.
+             Lens is 0.52 m above the table. Its 102 deg horizontal FOV becomes
+             about 69.5 deg vertical FOV at the native 16:9 aspect ratio. -->
+        <camera name="overhead" pos="0.20 0.04 0.52" xyaxes="1 0 0 0 1 0"
+            fovy="69.5" resolution="1280 720" />
         <geom name="floor" size="0 0 0.05" pos="0 0 0" type="plane" material="groundplane" />
 
         <!-- 잡을 물체: Menagerie scene_box.xml의 검증된 스펙 그대로 (4x4x6cm), 색만 빨강 -->

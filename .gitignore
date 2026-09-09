@@ -6,11 +6,16 @@ __pycache__/
 # Learned models and temporary outputs
 models/
 outputs/
+results/
+!benchmarks/
+!benchmarks/results/
+!benchmarks/results/**
 
 # Local datasets and recordings
 lerobot_data/
-videos/
+/videos/
 *.mp4
+!artifacts/**/*.mp4
 *.rrd
 
 # Secrets
@@ -19,6 +24,7 @@ videos/
 *.token
 hf_token*
 secrets/
+config/*.local.json
 
 # OS / editor files
 .vscode/

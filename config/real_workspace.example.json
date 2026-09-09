@@ -1,0 +1,24 @@
+{
+  "format_version": 1,
+  "layout_id": "new_workspace_YYYY_MM_DD",
+  "location_note": "new workspace",
+  "table": {
+    "surface": "white_matte_ceramic",
+    "surface_confirmed": true
+  },
+  "task_workspace": {
+    "x_bounds_m": [0.10, 0.32],
+    "y_bounds_m": [-0.16, 0.24],
+    "recovery_guard_margin_m": 0.02,
+    "note": "Replace with the physically marked safe region if the real layout must be narrower."
+  },
+  "operator_checks": {
+    "layout_locked": false,
+    "camera_pillar_secured": false,
+    "robot_base_secured": false,
+    "workspace_clear": false,
+    "task_workspace_marked": false,
+    "emergency_stop_ready": false,
+    "camera_views_visually_confirmed": false
+  }
+}

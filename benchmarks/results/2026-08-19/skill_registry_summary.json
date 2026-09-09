@@ -1,0 +1,55 @@
+{
+  "date": "2026-08-19",
+  "scope": "minimal_s6_skill_registry",
+  "registered_skills": [
+    "observe_target",
+    "pick",
+    "recover_pick",
+    "transport",
+    "place_6cm"
+  ],
+  "contract_checks": {
+    "precondition_blocked": true,
+    "recovery_completed": true,
+    "effect_applied": true,
+    "transport_after_recovery": true,
+    "timeout_rejected": true,
+    "cooperative_timeout_interrupted": true
+  },
+  "mujoco": {
+    "seed": 9101,
+    "normal": {
+      "task_success": true,
+      "truth_success": true,
+      "truth_target_coverage": 1.0,
+      "recovery_used": false
+    },
+    "forced_place_drop": {
+      "fault_detected": true,
+      "initial_failure_reason": "drop_during_place_approach",
+      "declared_recovery_plan": [
+        "recover_pick",
+        "transport",
+        "place_6cm"
+      ],
+      "recovery_completed": true,
+      "recovered_block_pose": "TIPPED",
+      "task_success": true,
+      "truth_success": true,
+      "truth_target_coverage": 1.0
+    }
+  },
+  "current_boundary": {
+    "system2_registry_selection_integrated": false,
+    "return_home_registered": false,
+    "emergency_stop_registered": false,
+    "real_shadow_registry_execution_verified": false,
+    "s6_complete": false
+  },
+  "raw_local_outputs": [
+    "outputs/skill_registry/normal.json",
+    "outputs/skill_registry/normal.jsonl",
+    "outputs/skill_registry/forced_place_drop.json",
+    "outputs/skill_registry/forced_place_drop.jsonl"
+  ]
+}

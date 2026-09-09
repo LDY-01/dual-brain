@@ -17,13 +17,16 @@ import mujoco
 import numpy as np
 from PIL import Image
 
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from envs.so101_pick_env import load_mj_model
+
 # 기본은 픽업 씬(블록+목표 구역). 다른 씬을 보려면 인자로 xml 경로 전달.
 DEFAULT_SCENE = Path(__file__).parent.parent / "assets" / "so101" / "pick_scene.xml"
 SCENE = sys.argv[1] if len(sys.argv) > 1 else str(DEFAULT_SCENE)
 PORT = 7799
 W, H = 960, 720
 
-model = mujoco.MjModel.from_xml_path(SCENE)
+model = load_mj_model(SCENE)
 model.vis.global_.offwidth, model.vis.global_.offheight = W, H
 data = mujoco.MjData(model)
 renderer = mujoco.Renderer(model, height=H, width=W)

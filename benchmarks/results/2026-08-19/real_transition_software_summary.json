@@ -1,0 +1,86 @@
+{
+  "date": "2026-08-19",
+  "motor_commands_issued": 0,
+  "implemented": {
+    "windows_camera_pnp_enumeration": true,
+    "opencv_probe_snapshots": true,
+    "camera_role_identity_gate": true,
+    "layout_bound_real_preflight": true,
+    "record_only_first_pick_10_trial_session": true,
+    "overhead_vision_robustness_benchmark": true
+  },
+  "current_real_hardware_state": {
+    "windows_pnp_camera_count": 3,
+    "external_u20cam_count": 2,
+    "detected_names": ["Innomaker-U20CAM-720P", "Innomaker-U20CAM-720P", "720p HD Camera"],
+    "wrist_registered": true,
+    "wrist_opencv_index": 1,
+    "overhead_registered": true,
+    "overhead_opencv_index": 2,
+    "dual_camera_live_check_passed": true,
+    "new_workspace_profile_present": true,
+    "new_workspace_operator_checks_complete": false,
+    "new_workspace_shoulder_pan_limit_present": false,
+    "new_workspace_overhead_calibration_present": false,
+    "motion_authorized": false
+  },
+  "self_tests": {
+    "valid_preflight_authorized": true,
+    "missing_emergency_stop_blocked": true,
+    "eight_of_ten_pick_summary_passes": true,
+    "incomplete_pick_session_blocked": true,
+    "clear_view_pose_and_fallback_cases_passed": "8/8"
+  },
+  "real_camera_frame_check": {
+    "red_clutter_detected_at_image_border": true,
+    "connected_component_filter_added": true,
+    "isolated_block_pixels": 7946,
+    "simulation_regression_after_filter": "40/40 gates passed",
+    "real_pose_classification_deferred_until_vertical_new_workspace_setup": true
+  },
+  "overhead_vision_robustness": {
+    "seed": 1908,
+    "cases_per_scenario": 50,
+    "total_cases": 200,
+    "nominal": {
+      "detected": 50,
+      "pose_correct": 50,
+      "actionable_wrong_pose": 0,
+      "p95_xy_error_m": 0.001206897062109319
+    },
+    "photometric": {
+      "detected": 47,
+      "pose_correct": 44,
+      "non_actionable_pose": 8,
+      "actionable_wrong_pose": 0,
+      "p95_xy_error_m": 0.0047626058005833735
+    },
+    "partial_occlusion": {
+      "detected": 47,
+      "pose_correct": 39,
+      "non_actionable_pose": 14,
+      "actionable_wrong_pose": 0,
+      "p95_xy_error_m": 0.007533769417240801
+    },
+    "stale_calibration_after_camera_move": {
+      "detected": 50,
+      "pose_correct": 48,
+      "actionable_wrong_pose": 1,
+      "p95_xy_error_m": 0.044053760428003824,
+      "recalibration_required": true
+    },
+    "all_gates_passed": true
+  },
+  "overhead_vision_supplemental_seed": {
+    "seed": 20260819,
+    "cases_per_scenario": 50,
+    "total_cases": 200,
+    "all_gates_passed": false,
+    "failed_gate": "photometric",
+    "photometric_p95_xy_error_m": 0.015654379480299234,
+    "photometric_limit_m": 0.015,
+    "partial_occlusion_actionable_wrong_pose": 3,
+    "interpretation": "The official reproducibility seed passes, but robustness margin is not yet sufficient for real deployment. Retest and tune after vertical installation and new-workspace calibration."
+  },
+  "next_real_gate": "At the new workspace, register both physical cameras, lock the layout, measure shoulder-pan limits, recalibrate overhead homography, and rerun preflight before any low-speed pick."
+}

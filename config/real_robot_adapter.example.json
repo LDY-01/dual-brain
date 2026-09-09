@@ -1,0 +1,66 @@
+{
+  "format_version": 1,
+  "robot": {
+    "port": "COM3",
+    "id": "so101_follower",
+    "use_degrees": true,
+    "max_relative_target": 5.0,
+    "calibration_dir": null
+  },
+  "policy": {
+    "checkpoint": "artifacts/checkpoints/act_pick_v22/pretrained_model",
+    "image_key": "observation.images.wrist",
+    "control_hz": 25,
+    "n_action_steps": 10,
+    "joint_order": [
+      "shoulder_pan",
+      "shoulder_lift",
+      "elbow_flex",
+      "wrist_flex",
+      "wrist_roll",
+      "gripper"
+    ]
+  },
+  "policy_image": {
+    "width": 640,
+    "height": 480,
+    "transform": "center_crop_resize"
+  },
+  "joint_mapping": {
+    "shoulder_pan": {
+      "robot_units_per_policy_rad": 57.29577951308232,
+      "robot_zero": 0.0,
+      "verified_on_physical_robot": false
+    },
+    "shoulder_lift": {
+      "robot_units_per_policy_rad": 57.29577951308232,
+      "robot_zero": 0.0,
+      "verified_on_physical_robot": false
+    },
+    "elbow_flex": {
+      "robot_units_per_policy_rad": 57.29577951308232,
+      "robot_zero": 0.0,
+      "verified_on_physical_robot": false
+    },
+    "wrist_flex": {
+      "robot_units_per_policy_rad": 57.29577951308232,
+      "robot_zero": 0.0,
+      "verified_on_physical_robot": false
+    },
+    "wrist_roll": {
+      "robot_units_per_policy_rad": 57.29577951308232,
+      "robot_zero": 0.0,
+      "verified_on_physical_robot": false
+    },
+    "gripper": {
+      "robot_units_per_policy_rad": 52.08721192625485,
+      "robot_zero": 9.09091003754848,
+      "verified_on_physical_robot": false
+    }
+  },
+  "active_mode": {
+    "require_all_joint_mappings_verified": true,
+    "require_motion_authorized_preflight": true,
+    "confirmation_token": "ENABLE_REAL_MOTION"
+  }
+}

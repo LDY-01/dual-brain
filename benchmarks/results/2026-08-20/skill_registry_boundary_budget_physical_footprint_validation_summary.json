@@ -1,0 +1,131 @@
+{
+  "date": "2026-08-20",
+  "scope": "s6_boundary_recovery_stage_budgets_physical_footprint_validation",
+  "protocol": {
+    "runtime_privileged_object_state": false,
+    "truth_used_after_episode_for_scoring_only": true,
+    "object_profile": "real_28g",
+    "normal_seed_range": [18000, 18049],
+    "forced_place_drop_seed_range": [19000, 19009],
+    "task_success_coverage_required": 0.75,
+    "camera_success_coverage_required": 0.76,
+    "projection_safety_margin": 0.01,
+    "success_coverage_method": "physical_footprint_projected_polygon_intersection",
+    "block_footprint_dimensions_m": {
+      "UPRIGHT": [0.04, 0.04],
+      "TIPPED": [0.06, 0.04]
+    },
+    "stage_budgets_s": {
+      "observe": 5.0,
+      "pick": 200.0,
+      "transport": 45.0,
+      "place": 85.0
+    },
+    "max_task_cycles": 3,
+    "max_task_duration_s": 300.0
+  },
+  "implementation": {
+    "boundary_recovery": "within 4 cm of a workspace edge, recovery pre-grasp starts on the outside side and enters inward; corner normals are blended",
+    "stage_budgeting": "stage budgets are cumulative across retries and task cycles and are also bounded by the 300 second overall deadline",
+    "success_geometry": "camera-estimated center, orientation and UPRIGHT/TIPPED pose build the full physical footprint before target-polygon intersection",
+    "fault_recovery_scoring": "requires both state-machine success and post-episode MuJoCo truth success"
+  },
+  "rejected_intermediate_method": {
+    "method": "visible_red_component_projected_convex_hull",
+    "reason": "a partially visible red patch could be entirely inside the target while most of the physical block remained outside",
+    "normal": {
+      "episodes": 50,
+      "state_machine_successes": 40,
+      "truth_successes": 39,
+      "camera_truth_disagreements": 3,
+      "false_positive_seeds": [16028, 16037],
+      "false_negative_seeds": [16038]
+    },
+    "forced_place_drop": {
+      "episodes": 10,
+      "state_machine_successes": 4,
+      "truth_successes": 3,
+      "camera_truth_disagreements": 1,
+      "false_positive_seeds": [17004]
+    }
+  },
+  "final_independent_normal_50": {
+    "episodes": 50,
+    "state_machine_successes": 40,
+    "state_machine_success_rate": 0.8,
+    "truth_successes": 40,
+    "truth_success_rate": 0.8,
+    "truth_wilson_95_interval": [0.6696289406777459, 0.887562499842239],
+    "camera_truth_disagreements": 0,
+    "false_positive_seeds": [],
+    "false_negative_seeds": [],
+    "boundary_guard_activations": 4,
+    "stage_budget_exhaustions": 9,
+    "final_block_unreachable": 5,
+    "mean_pick_attempts": 1.6,
+    "max_pick_attempts": 8,
+    "mean_wall_time_s": 144.0973567799991,
+    "median_wall_time_s": 111.71748150000349,
+    "p95_wall_time_s": 279.95348737996534,
+    "max_wall_time_s": 300.6228453000076,
+    "failure_reasons": {
+      "pick_stage_budget_exhausted": 8,
+      "overall_task_deadline": 1,
+      "block_outside_workspace": 1
+    }
+  },
+  "final_independent_forced_place_drop_10": {
+    "episodes": 10,
+    "faults_injected": 10,
+    "state_machine_successes": 8,
+    "state_machine_success_rate": 0.8,
+    "truth_successes": 8,
+    "truth_success_rate": 0.8,
+    "truth_wilson_95_interval": [0.49016247153664183, 0.9433178485456247],
+    "camera_truth_disagreements": 0,
+    "faults_recovered": 8,
+    "boundary_guard_activations": 3,
+    "stage_budget_exhaustions": 1,
+    "final_block_unreachable": 1,
+    "mean_pick_attempts": 2.0,
+    "max_pick_attempts": 7,
+    "mean_wall_time_s": 113.57446423002985,
+    "median_wall_time_s": 70.83041340007912,
+    "p95_wall_time_s": 230.35947360506978,
+    "max_wall_time_s": 240.78077480010688,
+    "failure_reasons": {
+      "pick_stage_budget_exhausted": 1,
+      "block_outside_workspace": 1
+    }
+  },
+  "comparison_to_previous_independent_results": {
+    "previous_normal_truth_successes": "124/150 (82.7%)",
+    "current_normal_truth_successes": "40/50 (80.0%)",
+    "normal_change_percentage_points": -2.6666666666666665,
+    "normal_improvement_proven": false,
+    "previous_forced_drop_truth_successes": "11/20 (55.0%)",
+    "current_forced_drop_truth_successes": "8/10 (80.0%)",
+    "forced_drop_change_percentage_points": 25.0,
+    "forced_drop_improvement_proven": false,
+    "reason_not_proven": "the 95 percent Wilson intervals overlap and the current forced-drop sample contains only 10 episodes"
+  },
+  "entry_gate": {
+    "normal_success_rate_required": 0.85,
+    "passed": false,
+    "shadow_mode_and_slow_pick_10_automatically_started": false,
+    "decision": "retain real shadow mode and slow first-pick 10 as the next hardware step, but do not mark the simulation entry gate as passed"
+  },
+  "remaining_risks": [
+    "normal success remains 80 percent and does not meet the 85 percent entry gate",
+    "eight of ten normal failures exhausted the cumulative pick-stage budget",
+    "boundary-aware recovery still ended outside the workspace in one normal and one forced-drop episode",
+    "forced-drop recovery improved to 8 of 10 but the sample is too small to prove a general improvement",
+    "physical footprint projection still requires a newly calibrated real overhead camera"
+  ],
+  "raw_local_outputs": [
+    "outputs/skill_registry_budget200_gate5_2026-08-20/episodes.jsonl",
+    "outputs/skill_registry_physical_footprint_targeted_2026-08-20/episodes.jsonl",
+    "outputs/skill_registry_physical_footprint_independent_2026-08-20/episodes.jsonl",
+    "outputs/skill_registry_physical_footprint_independent_2026-08-20/summary.json"
+  ]
+}

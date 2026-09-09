@@ -1,0 +1,98 @@
+{
+  "date": "2026-08-18",
+  "environment": "MuJoCo SO-101 dual-camera simulation",
+  "runtime_privileged_object_state": false,
+  "success_criterion": {
+    "minimum_contact_footprint_coverage": 0.75,
+    "stable_camera_frames": 10,
+    "pose_aware_contact_face": true
+  },
+  "selected_condition_results": {
+    "normal_pick_transport_place": {
+      "trials": 3,
+      "completed": 3,
+      "false_drop_aborts": 0,
+      "truth_coverages": [1.0, 1.0, 1.0]
+    },
+    "forced_place_drop_detection": {
+      "trials": 3,
+      "detected": 3,
+      "intentional_releases_after_detection": 0,
+      "next_state": "PICK"
+    },
+    "normal_autonomous_loop": {
+      "trials": 1,
+      "completed": 1,
+      "cycles_attempted": 1,
+      "recovery_cycles": 0,
+      "final_truth_coverage": 1.0,
+      "final_state": "DONE"
+    },
+    "forced_drop_autonomous_recovery": {
+      "trials": 1,
+      "completed": 1,
+      "drop_detected_in_cycle": 1,
+      "completed_in_cycle": 2,
+      "recovery_pick_attempts_in_final_cycle": 2,
+      "final_truth_coverage": 0.8293469497446923,
+      "final_state": "DONE",
+      "policy_correct_recovery": true
+    },
+    "clear_view_and_pose_upgrade": {
+      "clear_view_cases": 8,
+      "passed": 8,
+      "upright_positions_correct": "3/3",
+      "tipped_positions_correct": "3/3",
+      "upright_classification_correct": true,
+      "tipped_classification_correct": true,
+      "preferred_view_occluded_switched_to_alternate": true,
+      "both_views_occluded_safe_stop": true,
+      "normal_end_to_end": {
+        "completed": true,
+        "cycles_attempted": 1,
+        "final_truth_coverage": 1.0
+      },
+      "forced_drop_end_to_end": {
+        "completed": true,
+        "drop_detected_in_cycle": 1,
+        "cycles_attempted": 3,
+        "final_truth_coverage": 0.9825315775329213,
+        "intermediate_place_recheck_failures": 1,
+        "final_state": "DONE"
+      }
+    },
+    "real_overhead_calibration_preparation": {
+      "connected_wrist_camera_detected": false,
+      "wrist_camera_index": null,
+      "wrist_capture_resolution": null,
+      "laptop_builtin_camera_detected": true,
+      "laptop_builtin_camera_index": 0,
+      "overhead_camera_registered": false,
+      "overhead_camera_index": null,
+      "homography_self_test_passed": true,
+      "pose_aware_planes": [
+        "target_table",
+        "upright_top_6cm",
+        "tipped_top_4cm"
+      ],
+      "actual_table_calibration_completed": false,
+      "blocking_condition": "both external robot cameras are currently disconnected; wrist and overhead must be connected, visually identified, assigned stable runtime roles, and calibrated"
+    },
+    "real_robot_pillar_safety_preparation": {
+      "task_workspace_policy": "opposite_side_of_camera_pillar",
+      "camera_pillar_side": "right",
+      "motor_units_verified": "degrees",
+      "manual_encoder_capture_tool_implemented": true,
+      "automatic_motion_during_limit_capture": false,
+      "minimum_measurement_clearance_cm": 5.0,
+      "default_additional_margin_deg": 10.0,
+      "absolute_command_clamp_test_passed": true,
+      "unconfigured_limit_blocks_motion_test_passed": true,
+      "already_outside_limit_blocks_powered_recovery_test_passed": true,
+      "physical_boundary_measured": false,
+      "real_robot_motion_enabled": false,
+      "blocking_condition": "physical shoulder-pan boundary and encoder direction have not yet been measured on the current pillar layout"
+    }
+  },
+  "scope_warning": "Selected small simulation samples; these results are not a general 100% success-rate claim or a real-robot evaluation."
+}

@@ -1,0 +1,94 @@
+{
+  "date": "2026-08-19",
+  "scope": "s6_camera_pick_place_software_improvement",
+  "runtime_privileged_object_state": false,
+  "truth_used_after_episode_for_scoring_only": true,
+  "object_profile": "real_28g",
+  "pre_improvement_baseline": {
+    "normal": {
+      "seed_range": [12000, 12049],
+      "episodes": 50,
+      "state_machine_successes": 41,
+      "state_machine_success_rate": 0.82,
+      "truth_successes": 40,
+      "truth_success_rate": 0.8,
+      "camera_truth_disagreements": 1,
+      "mean_pick_attempts": 2.34,
+      "max_pick_attempts": 9,
+      "max_wall_time_s": 626.588
+    },
+    "forced_place_drop": {
+      "seed_range": [13000, 13009],
+      "episodes": 10,
+      "faults_injected": 10,
+      "state_machine_successes": 4,
+      "state_machine_success_rate": 0.4,
+      "truth_successes": 5,
+      "truth_success_rate": 0.5,
+      "camera_truth_disagreements": 1
+    }
+  },
+  "implemented_fixes": [
+    "cooperative per-skill and overall-task deadline enforcement",
+    "three bounded full-task retry cycles within 300 seconds",
+    "recovery grasp re-tighten and contact settle",
+    "slower recovery transport and conservative recovery place",
+    "verify an early place drop that may already be inside the target",
+    "retry coarse_position_unreachable instead of terminating immediately",
+    "0.78 camera coverage safety margin for the 0.75 truth criterion",
+    "deeper recovery failure and camera-truth disagreement reporting"
+  ],
+  "targeted_regression": {
+    "normal_problem_seeds": {
+      "seeds": [12000, 12002, 12007, 12011, 12026, 12028, 12029, 12039, 12044, 12047],
+      "successes": 5,
+      "failures": {
+        "block_outside_workspace": 3,
+        "overall_task_deadline": 2
+      }
+    },
+    "forced_drop_problem_seeds": {
+      "seeds": [13001, 13003, 13004, 13005, 13007, 13008],
+      "faults_injected": 6,
+      "state_machine_successes": 5,
+      "truth_successes": 5,
+      "camera_truth_disagreements": 0,
+      "failures": {
+        "overall_task_deadline": 1
+      }
+    }
+  },
+  "post_improvement_independent_normal": {
+    "seed_range": [14000, 14049],
+    "episodes": 50,
+    "state_machine_successes": 42,
+    "state_machine_success_rate": 0.84,
+    "truth_successes": 42,
+    "truth_success_rate": 0.84,
+    "wilson_95_interval": [0.7148578393696501, 0.916625793219666],
+    "camera_truth_disagreements": 2,
+    "false_positive_seeds": [14040],
+    "false_negative_seeds": [14037],
+    "mean_pick_attempts": 1.98,
+    "max_pick_attempts": 7,
+    "mean_wall_time_s": 115.443,
+    "median_wall_time_s": 75.915,
+    "p95_wall_time_s": 300.535,
+    "max_wall_time_s": 300.613,
+    "failure_reasons": {
+      "block_outside_workspace": 4,
+      "overall_task_deadline": 4
+    }
+  },
+  "conclusion": {
+    "truth_success_rate_change_percentage_points": 4.0,
+    "max_wall_time_reduced_s": 325.975,
+    "general_success_improvement_proven": false,
+    "reason": "The independent 50-episode result improved from 80% to 84%, but the sample intervals overlap.",
+    "remaining_risks": [
+      "camera coverage decisions near the 75 percent boundary",
+      "block pushed outside the reachable workspace",
+      "difficult episodes reaching the 300 second task deadline"
+    ]
+  }
+}

@@ -22,7 +22,7 @@ import mujoco
 import numpy as np
 from anthropic import beta_tool
 
-from envs.so101_pick_env import SO101PickEnv, SUCCESS_RADIUS
+from envs.so101_pick_env import SO101PickEnv
 from skills.primitives import move_to as skill_move_to
 from skills.primitives import pick as skill_pick
 from skills.primitives import place as skill_place
@@ -350,12 +350,13 @@ def _run_student(checkpoint: str = "015000", max_steps: int = 300):
     import torch
 
     from eval.eval_act_pick import (
-        BLOCK_ON_TABLE_Z, SETTLE_STEPS, load_policy, obs_to_batch,
+        REPO_ROOT, SETTLE_STEPS, VERSIONS, load_policy, obs_to_batch,
     )
 
     if checkpoint not in _student:
         device = "mps" if torch.backends.mps.is_available() else "cpu"
-        _student[checkpoint] = load_policy(checkpoint, device)
+        ckpt_root = REPO_ROOT / VERSIONS["v1"][0]
+        _student[checkpoint] = load_policy(checkpoint, device, ckpt_root)
     policy, pre, post = _student[checkpoint]
 
     # 학습 분포 맞추기: 데이터가 전부 홈 자세 시작이므로 팔을 홈으로 복귀
@@ -377,8 +378,7 @@ def _run_student(checkpoint: str = "015000", max_steps: int = 300):
             np.asarray(action.squeeze(0).cpu(), dtype=np.float64))
         FRAMES.append(obs["pixels"])
         steps = t + 1
-        ok = (info["dist_to_target"] < SUCCESS_RADIUS
-              and info["block_height"] < BLOCK_ON_TABLE_Z)
+        ok = info["success"]
         settled = settled + 1 if ok else 0
         if settled >= SETTLE_STEPS:
             return True, steps, info
@@ -503,7 +503,7 @@ def run_command(client, command):
         if _done["flag"]:
             break
     final = env._get_info()
-    truth = final["dist_to_target"] < SUCCESS_RADIUS
+    truth = final["success"]
     print(f"\nSystem 2 보고: success={_done['success']} — {_done['summary']}")
     print(f"물리적 사실:   블록-목표 거리 {final['dist_to_target'] * 1000:.0f}mm → {'진짜 성공' if truth else '실패'}")
     _transcript("판정", f"System 2 보고 success={_done['success']} ({_done['summary']}) | "
