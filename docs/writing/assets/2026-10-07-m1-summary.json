@@ -1,0 +1,127 @@
+{
+  "created_at": "2026-10-07T15:50:49.108577+09:00",
+  "mode": "simulation_only",
+  "motion_authorized": false,
+  "physical_calibration_required": true,
+  "dynamics_validated": false,
+  "tool": {
+    "profile_id": "virtual-x-axis-60mm-v1",
+    "tip_offset_m": [
+      0.06,
+      0,
+      0
+    ],
+    "axis_local": [
+      1,
+      0,
+      0
+    ],
+    "shaft_length_m": 0.145,
+    "shaft_radius_m": 0.00625,
+    "nib_length_m": 0.01,
+    "nib_radius_m": 0.0005,
+    "gripper_rad": 0.1,
+    "simulation_only": true,
+    "calibrated": false
+  },
+  "paper_frame": {
+    "origin_m": [
+      0.2,
+      0.04,
+      0.005
+    ],
+    "x_axis": [
+      0,
+      -1,
+      0
+    ],
+    "y_axis": [
+      1,
+      0,
+      0
+    ],
+    "working_rect_mm": [
+      8,
+      8,
+      150,
+      80
+    ]
+  },
+  "settings": {
+    "position_tolerance_mm": 0.75,
+    "angle_tolerance_deg": 3,
+    "cartesian_step_mm": 1,
+    "max_joint_step_rad": 0.04,
+    "joint_speed_rad_s": 0.5,
+    "tip_speed_mm_s": 20,
+    "max_points": 20000,
+    "ik_iterations": 200
+  },
+  "total_cases": 7,
+  "passed_cases": 7,
+  "cases": {
+    "line": {
+      "status": "passed",
+      "samples": 46,
+      "failure": null,
+      "report": "outputs\\writing\\m1-2026-10-07\\line\\report.json",
+      "max_position_error_mm": 0.4325348970781173,
+      "max_angle_error_deg": 0.16950606516323408,
+      "motion_authorized": false
+    },
+    "square": {
+      "status": "passed",
+      "samples": 114,
+      "failure": null,
+      "report": "outputs\\writing\\m1-2026-10-07\\square\\report.json",
+      "max_position_error_mm": 0.4359679864219685,
+      "max_angle_error_deg": 0.16950606516323408,
+      "motion_authorized": false
+    },
+    "call": {
+      "status": "passed",
+      "samples": 192,
+      "failure": null,
+      "report": "outputs\\writing\\m1-2026-10-07\\call\\report.json",
+      "max_position_error_mm": 0.43253627111522014,
+      "max_angle_error_deg": 0.17348250127339812,
+      "motion_authorized": false
+    },
+    "ga": {
+      "status": "passed",
+      "samples": 131,
+      "failure": null,
+      "report": "outputs\\writing\\m1-2026-10-07\\ga\\report.json",
+      "max_position_error_mm": 0.43253603179371525,
+      "max_angle_error_deg": 0.17301949765562674,
+      "motion_authorized": false
+    },
+    "han": {
+      "status": "passed",
+      "samples": 245,
+      "failure": null,
+      "report": "outputs\\writing\\m1-2026-10-07\\han\\report.json",
+      "max_position_error_mm": 0.7496138679167199,
+      "max_angle_error_deg": 0.16380852884383035,
+      "motion_authorized": false
+    },
+    "geul": {
+      "status": "passed",
+      "samples": 174,
+      "failure": null,
+      "report": "outputs\\writing\\m1-2026-10-07\\geul\\report.json",
+      "max_position_error_mm": 0.4325428106761434,
+      "max_angle_error_deg": 0.16269494703955495,
+      "motion_authorized": false
+    },
+    "sentence": {
+      "status": "passed",
+      "samples": 1018,
+      "failure": null,
+      "report": "outputs\\writing\\m1-2026-10-07\\sentence\\report.json",
+      "max_position_error_mm": 0.7495531633203055,
+      "max_angle_error_deg": 0.1734466393729941,
+      "motion_authorized": false
+    }
+  }
+}

@@ -1,0 +1,217 @@
+{
+  "created_at": "2026-10-07T19:25:34.862638+09:00",
+  "mode": "simulation_only",
+  "kind": "writing_dynamics_rollout",
+  "format_version": 2,
+  "paper_coordinate_convention": "top_left_x_right_y_down_z_away",
+  "scope": "full_cycle",
+  "transit": {
+    "ready_q_rad": [
+      0.0992351067,
+      -0.2717824768,
+      0.2524989785,
+      1.5859414678,
+      -0.1334262657
+    ],
+    "travel_height_mm": 16.0,
+    "minimum_clearance_mm": 12.0
+  },
+  "motion_authorized": false,
+  "physical_calibration_required": true,
+  "dynamics_validated": false,
+  "physical_dynamics_validated": false,
+  "pressure_validated": false,
+  "dynamics_settings": {
+    "timestep_s": 0.005,
+    "time_scale": 1.0,
+    "settle_s": 0.5,
+    "final_hold_s": 0.3,
+    "tracking_tolerance_mm": 1.0,
+    "joint_tracking_tolerance_rad": 0.02,
+    "max_joint_speed_rad_s": 0.75,
+    "max_tip_speed_mm_s": 30.0,
+    "stop_timeout_s": 1.0,
+    "stop_stable_s": 0.1,
+    "stop_joint_speed_rad_s": 0.02,
+    "stop_tip_speed_mm_s": 2.0,
+    "max_stop_displacement_mm": 2.0,
+    "max_steps": 40000
+  },
+  "tool": {
+    "profile_id": "virtual-x-axis-60mm-v1",
+    "tip_offset_m": [
+      0.06,
+      0.0,
+      0.0
+    ],
+    "axis_local": [
+      1.0,
+      0.0,
+      0.0
+    ],
+    "shaft_length_m": 0.145,
+    "shaft_radius_m": 0.00625,
+    "nib_length_m": 0.01,
+    "nib_radius_m": 0.0005,
+    "gripper_rad": 0.1,
+    "simulation_only": true,
+    "calibrated": false
+  },
+  "paper_frame": {
+    "origin_m": [
+      0.2,
+      -0.04,
+      0.005
+    ],
+    "x_axis": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "y_axis": [
+      1.0,
+      0.0,
+      0.0
+    ],
+    "working_rect_mm": [
+      8.0,
+      8.0,
+      150.0,
+      80.0
+    ]
+  },
+  "settings": {
+    "position_tolerance_mm": 0.75,
+    "angle_tolerance_deg": 3.0,
+    "cartesian_step_mm": 1.0,
+    "max_joint_step_rad": 0.04,
+    "joint_speed_rad_s": 0.5,
+    "tip_speed_mm_s": 20.0,
+    "max_points": 20000,
+    "ik_iterations": 200
+  },
+  "total_cases": 1,
+  "passed_cases": 0,
+  "cases": {
+    "custom": {
+      "status": "rejected",
+      "samples": 546,
+      "scope": "full_cycle",
+      "phase": "writing",
+      "approach_validated": false,
+      "departure_validated": false,
+      "ready_return_validated": false,
+      "failure": {
+        "reason": "actual_tip_overspeed",
+        "phase": "writing",
+        "sim_time_s": 2.729999999999964
+      },
+      "report": "outputs\\writing\\m1-dynamics-2026-10-07\\original-speed\\report.json",
+      "motion_authorized": false,
+      "dynamics_validated": false,
+      "physical_dynamics_validated": false,
+      "pressure_validated": false,
+      "simulation_steps": 546,
+      "actual_simulated_duration_s": 2.729999999999964,
+      "max_tracking_error_mm": 0.6792160000068858,
+      "max_path_error_mm": 1.0788179153210014,
+      "max_joint_error_rad": 0.0016524302587799244,
+      "max_axis_error_deg": 0.22205703086007023,
+      "max_joint_speed_rad_s": 0.19201603728750335,
+      "max_tip_speed_mm_s": 34.17586161638169,
+      "max_actuator_force_model_units": 1.617704166075555,
+      "stop_test_passed": false,
+      "stop_request_trajectory_time_s": null,
+      "stop_settling_time_s": null,
+      "stop_max_displacement_mm": null
+    }
+  },
+  "model": {
+    "mujoco_version": "3.11.0",
+    "timestep_s": 0.005,
+    "gravity_m_s2": [
+      0.0,
+      0.0,
+      -9.81
+    ],
+    "integrator": 3,
+    "actuator_names": [
+      "shoulder_pan",
+      "shoulder_lift",
+      "elbow_flex",
+      "wrist_flex",
+      "wrist_roll",
+      "gripper"
+    ],
+    "kp": [
+      998.22,
+      998.22,
+      998.22,
+      998.22,
+      998.22,
+      998.22
+    ],
+    "kv": [
+      2.731,
+      2.731,
+      2.731,
+      2.731,
+      2.731,
+      2.731
+    ],
+    "force_ranges_model_units": [
+      [
+        -2.94,
+        2.94
+      ],
+      [
+        -2.94,
+        2.94
+      ],
+      [
+        -2.94,
+        2.94
+      ],
+      [
+        -2.94,
+        2.94
+      ],
+      [
+        -2.94,
+        2.94
+      ],
+      [
+        -2.94,
+        2.94
+      ]
+    ],
+    "control_ranges_rad": [
+      [
+        -1.91986,
+        1.91986
+      ],
+      [
+        -1.74533,
+        1.74533
+      ],
+      [
+        -1.69,
+        1.69
+      ],
+      [
+        -1.65806,
+        1.65806
+      ],
+      [
+        -2.74385,
+        2.84121
+      ],
+      [
+        -0.17453,
+        1.74533
+      ]
+    ],
+    "pen_proxy_mass_kg": 0.0,
+    "actuator_gains_physically_calibrated": false
+  }
+}

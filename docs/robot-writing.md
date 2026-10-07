@@ -19,9 +19,46 @@ Implemented:
 - PNG, SVG, normalized 12-second SVG animation, and JSON exports.
 - Offline tests for all 11,172 modern Hangul syllables and planning invariants.
 
-This milestone does not implement speech recognition, model-generated answers,
-robot simulation, physical motion, ink pressure, or camera verification. A preview
-is a review of geometry, not evidence that a robot can follow that geometry.
+The offline preview does not implement speech recognition, model-generated answers,
+physical motion, ink pressure, or camera verification. M1 now adds simulation-only
+pen-tip IK, sampled approach/writing/departure/return preflight and MuJoCo pose replay.
+Virtual-actuator dynamics and hold stopping are now checked for the baseline profile;
+physical motor behavior, tool mass/compliance, pressure and writing remain unvalidated.
+See the dated [simulation record](writing/simulation.md) and [dynamics results](writing/dynamics.md).
+
+```powershell
+& '.\.venv\Scripts\python.exe' -X utf8 kwon_lab/tools/writing_simulation.py --text '네' --render
+& '.\.venv\Scripts\python.exe' -X utf8 kwon_lab/tools/writing_simulation.py --suite
+```
+
+The default mount is an uncalibrated 60mm local-x tip offset, not a measured grip.
+Override it with `--config kwon_lab/writing/config/virtual_mount.json` or a modified
+copy. Reports are diagnostics, never executable hardware command streams. Pose
+replay is not a dynamics rollout. The CLI starts at a configured virtual airborne
+ready pose, checks the approach and exit, and returns to those exact joints.
+Reaching that ready pose from a physical robot's boot/current state is NOT validated.
+See [dated transit checks](writing/transit.md) for results and limits.
+
+CLI default scope is `full_cycle`; use `--writing-only` only to reproduce the
+older writing-segment check. The Python `preflight` API retains writing-only
+behavior unless `transit=TransitSettings()` is supplied. Motion remains denied
+in both modes, and a writable path can fail because its exit is unreachable.
+
+```powershell
+# Actual mj_step integration of virtual actuators, not qpos reference replay
+& '.\.venv\Scripts\python.exe' -X utf8 kwon_lab/tools/writing_simulation.py --dynamics --text '네' --render
+# Request a simulated position-hold stop 5 seconds into the trajectory
+& '.\.venv\Scripts\python.exe' -X utf8 kwon_lab/tools/writing_simulation.py --dynamics --stop-after-s 5
+```
+
+Dynamics uses a 2x longer reference schedule by default. It preserves the model's
+gravity, actuator gains and force limits; the original 1x schedule is rejected for
+tip overspeed. `dynamics_validated=true` means ONLY virtual model validation under
+the recorded conditions. Physical dynamics and pressure flags stay false.
+Dynamics stop success has `status=stopped`, `stop_test_passed=true`, and
+`trajectory_complete=false`. It is not a physical emergency-stop certification.
+Single-case runs now also export `summary.json`. Python exit codes: 0 passed,
+2 rejected, 130 stopped; a shell wrapper may normalize nonzero exit codes.
 
 ## Text Call Screen
 

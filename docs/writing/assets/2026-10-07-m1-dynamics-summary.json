@@ -1,0 +1,381 @@
+{
+  "created_at": "2026-10-07T19:24:53.997689+09:00",
+  "mode": "simulation_only",
+  "kind": "writing_dynamics_rollout",
+  "format_version": 2,
+  "paper_coordinate_convention": "top_left_x_right_y_down_z_away",
+  "scope": "full_cycle",
+  "transit": {
+    "ready_q_rad": [
+      0.0992351067,
+      -0.2717824768,
+      0.2524989785,
+      1.5859414678,
+      -0.1334262657
+    ],
+    "travel_height_mm": 16,
+    "minimum_clearance_mm": 12
+  },
+  "motion_authorized": false,
+  "physical_calibration_required": true,
+  "dynamics_validated": true,
+  "physical_dynamics_validated": false,
+  "pressure_validated": false,
+  "dynamics_settings": {
+    "timestep_s": 0.005,
+    "time_scale": 2,
+    "settle_s": 0.5,
+    "final_hold_s": 0.3,
+    "tracking_tolerance_mm": 1,
+    "joint_tracking_tolerance_rad": 0.02,
+    "max_joint_speed_rad_s": 0.75,
+    "max_tip_speed_mm_s": 30,
+    "stop_timeout_s": 1,
+    "stop_stable_s": 0.1,
+    "stop_joint_speed_rad_s": 0.02,
+    "stop_tip_speed_mm_s": 2,
+    "max_stop_displacement_mm": 2,
+    "max_steps": 40000
+  },
+  "tool": {
+    "profile_id": "virtual-x-axis-60mm-v1",
+    "tip_offset_m": [
+      0.06,
+      0,
+      0
+    ],
+    "axis_local": [
+      1,
+      0,
+      0
+    ],
+    "shaft_length_m": 0.145,
+    "shaft_radius_m": 0.00625,
+    "nib_length_m": 0.01,
+    "nib_radius_m": 0.0005,
+    "gripper_rad": 0.1,
+    "simulation_only": true,
+    "calibrated": false
+  },
+  "paper_frame": {
+    "origin_m": [
+      0.2,
+      -0.04,
+      0.005
+    ],
+    "x_axis": [
+      0,
+      1,
+      0
+    ],
+    "y_axis": [
+      1,
+      0,
+      0
+    ],
+    "working_rect_mm": [
+      8,
+      8,
+      150,
+      80
+    ]
+  },
+  "settings": {
+    "position_tolerance_mm": 0.75,
+    "angle_tolerance_deg": 3,
+    "cartesian_step_mm": 1,
+    "max_joint_step_rad": 0.04,
+    "joint_speed_rad_s": 0.5,
+    "tip_speed_mm_s": 20,
+    "max_points": 20000,
+    "ik_iterations": 200
+  },
+  "total_cases": 7,
+  "passed_cases": 7,
+  "cases": {
+    "line": {
+      "status": "passed",
+      "samples": 1937,
+      "scope": "full_cycle",
+      "phase": "complete",
+      "approach_validated": true,
+      "departure_validated": true,
+      "ready_return_validated": true,
+      "failure": null,
+      "report": "outputs\\writing\\m1-dynamics-2026-10-07\\suite\\line\\report.json",
+      "motion_authorized": false,
+      "dynamics_validated": true,
+      "physical_dynamics_validated": false,
+      "pressure_validated": false,
+      "simulation_steps": 1937,
+      "actual_simulated_duration_s": 9.685000000000114,
+      "max_tracking_error_mm": 0.20941840730732217,
+      "max_path_error_mm": 0.5927893226842431,
+      "max_joint_error_rad": 0.0016222388868779025,
+      "max_axis_error_deg": 0.22205703086007023,
+      "max_joint_speed_rad_s": 0.2525592872572729,
+      "max_tip_speed_mm_s": 21.883024967199784,
+      "max_actuator_force_model_units": 1.4621991295875603,
+      "stop_test_passed": false,
+      "stop_request_trajectory_time_s": null,
+      "stop_settling_time_s": null,
+      "stop_max_displacement_mm": null
+    },
+    "square": {
+      "status": "passed",
+      "samples": 3063,
+      "scope": "full_cycle",
+      "phase": "complete",
+      "approach_validated": true,
+      "departure_validated": true,
+      "ready_return_validated": true,
+      "failure": null,
+      "report": "outputs\\writing\\m1-dynamics-2026-10-07\\suite\\square\\report.json",
+      "motion_authorized": false,
+      "dynamics_validated": true,
+      "physical_dynamics_validated": false,
+      "pressure_validated": false,
+      "simulation_steps": 3063,
+      "actual_simulated_duration_s": 15.315000000000994,
+      "max_tracking_error_mm": 0.4469829804728326,
+      "max_path_error_mm": 0.8658534721262546,
+      "max_joint_error_rad": 0.001824129243994277,
+      "max_axis_error_deg": 0.22205703086007023,
+      "max_joint_speed_rad_s": 0.29842510026559954,
+      "max_tip_speed_mm_s": 25.582281375600555,
+      "max_actuator_force_model_units": 1.663929825234618,
+      "stop_test_passed": false,
+      "stop_request_trajectory_time_s": null,
+      "stop_settling_time_s": null,
+      "stop_max_displacement_mm": null
+    },
+    "call": {
+      "status": "passed",
+      "samples": 4797,
+      "scope": "full_cycle",
+      "phase": "complete",
+      "approach_validated": true,
+      "departure_validated": true,
+      "ready_return_validated": true,
+      "failure": null,
+      "report": "outputs\\writing\\m1-dynamics-2026-10-07\\suite\\call\\report.json",
+      "motion_authorized": false,
+      "dynamics_validated": true,
+      "physical_dynamics_validated": false,
+      "pressure_validated": false,
+      "simulation_steps": 4797,
+      "actual_simulated_duration_s": 23.984999999999513,
+      "max_tracking_error_mm": 0.44940573069414025,
+      "max_path_error_mm": 0.8528414027827895,
+      "max_joint_error_rad": 0.0019076361630009364,
+      "max_axis_error_deg": 0.22205703086007023,
+      "max_joint_speed_rad_s": 0.32936316491339535,
+      "max_tip_speed_mm_s": 23.740726528099287,
+      "max_actuator_force_model_units": 1.7787238881403482,
+      "stop_test_passed": false,
+      "stop_request_trajectory_time_s": null,
+      "stop_settling_time_s": null,
+      "stop_max_displacement_mm": null
+    },
+    "ga": {
+      "status": "passed",
+      "samples": 3381,
+      "scope": "full_cycle",
+      "phase": "complete",
+      "approach_validated": true,
+      "departure_validated": true,
+      "ready_return_validated": true,
+      "failure": null,
+      "report": "outputs\\writing\\m1-dynamics-2026-10-07\\suite\\ga\\report.json",
+      "motion_authorized": false,
+      "dynamics_validated": true,
+      "physical_dynamics_validated": false,
+      "pressure_validated": false,
+      "simulation_steps": 3381,
+      "actual_simulated_duration_s": 16.90500000000092,
+      "max_tracking_error_mm": 0.4481958265619207,
+      "max_path_error_mm": 0.8492244967122007,
+      "max_joint_error_rad": 0.001970754468327618,
+      "max_axis_error_deg": 0.22205703086007023,
+      "max_joint_speed_rad_s": 0.3345803648077017,
+      "max_tip_speed_mm_s": 22.436326389992647,
+      "max_actuator_force_model_units": 1.812727333814479,
+      "stop_test_passed": false,
+      "stop_request_trajectory_time_s": null,
+      "stop_settling_time_s": null,
+      "stop_max_displacement_mm": null
+    },
+    "han": {
+      "status": "passed",
+      "samples": 5311,
+      "scope": "full_cycle",
+      "phase": "complete",
+      "approach_validated": true,
+      "departure_validated": true,
+      "ready_return_validated": true,
+      "failure": null,
+      "report": "outputs\\writing\\m1-dynamics-2026-10-07\\suite\\han\\report.json",
+      "motion_authorized": false,
+      "dynamics_validated": true,
+      "physical_dynamics_validated": false,
+      "pressure_validated": false,
+      "simulation_steps": 5311,
+      "actual_simulated_duration_s": 26.554999999999,
+      "max_tracking_error_mm": 0.4510503329948233,
+      "max_path_error_mm": 0.9580593305500601,
+      "max_joint_error_rad": 0.001856530994543082,
+      "max_axis_error_deg": 0.22205703086007023,
+      "max_joint_speed_rad_s": 0.3237814921908435,
+      "max_tip_speed_mm_s": 23.779037979536984,
+      "max_actuator_force_model_units": 1.760832521519319,
+      "stop_test_passed": false,
+      "stop_request_trajectory_time_s": null,
+      "stop_settling_time_s": null,
+      "stop_max_displacement_mm": null
+    },
+    "geul": {
+      "status": "passed",
+      "samples": 4290,
+      "scope": "full_cycle",
+      "phase": "complete",
+      "approach_validated": true,
+      "departure_validated": true,
+      "ready_return_validated": true,
+      "failure": null,
+      "report": "outputs\\writing\\m1-dynamics-2026-10-07\\suite\\geul\\report.json",
+      "motion_authorized": false,
+      "dynamics_validated": true,
+      "physical_dynamics_validated": false,
+      "pressure_validated": false,
+      "simulation_steps": 4290,
+      "actual_simulated_duration_s": 21.450000000000017,
+      "max_tracking_error_mm": 0.4506364608072312,
+      "max_path_error_mm": 0.8417110612596387,
+      "max_joint_error_rad": 0.0018260286167715578,
+      "max_axis_error_deg": 0.22205703086007023,
+      "max_joint_speed_rad_s": 0.3209111185792219,
+      "max_tip_speed_mm_s": 23.46369823832159,
+      "max_actuator_force_model_units": 1.7630144048950172,
+      "stop_test_passed": false,
+      "stop_request_trajectory_time_s": null,
+      "stop_settling_time_s": null,
+      "stop_max_displacement_mm": null
+    },
+    "sentence": {
+      "status": "passed",
+      "samples": 20044,
+      "scope": "full_cycle",
+      "phase": "complete",
+      "approach_validated": true,
+      "departure_validated": true,
+      "ready_return_validated": true,
+      "failure": null,
+      "report": "outputs\\writing\\m1-dynamics-2026-10-07\\suite\\sentence\\report.json",
+      "motion_authorized": false,
+      "dynamics_validated": true,
+      "physical_dynamics_validated": false,
+      "pressure_validated": false,
+      "simulation_steps": 20044,
+      "actual_simulated_duration_s": 100.21999999998134,
+      "max_tracking_error_mm": 0.45277300722223746,
+      "max_path_error_mm": 0.994843607757519,
+      "max_joint_error_rad": 0.0016466359614121795,
+      "max_axis_error_deg": 0.22205703086007023,
+      "max_joint_speed_rad_s": 0.2615590937104292,
+      "max_tip_speed_mm_s": 25.40269612015734,
+      "max_actuator_force_model_units": 1.503941562586192,
+      "stop_test_passed": false,
+      "stop_request_trajectory_time_s": null,
+      "stop_settling_time_s": null,
+      "stop_max_displacement_mm": null
+    }
+  },
+  "model": {
+    "mujoco_version": "3.11.0",
+    "timestep_s": 0.005,
+    "gravity_m_s2": [
+      0.0,
+      0.0,
+      -9.81
+    ],
+    "integrator": 3,
+    "actuator_names": [
+      "shoulder_pan",
+      "shoulder_lift",
+      "elbow_flex",
+      "wrist_flex",
+      "wrist_roll",
+      "gripper"
+    ],
+    "kp": [
+      998.22,
+      998.22,
+      998.22,
+      998.22,
+      998.22,
+      998.22
+    ],
+    "kv": [
+      2.731,
+      2.731,
+      2.731,
+      2.731,
+      2.731,
+      2.731
+    ],
+    "force_ranges_model_units": [
+      [
+        -2.94,
+        2.94
+      ],
+      [
+        -2.94,
+        2.94
+      ],
+      [
+        -2.94,
+        2.94
+      ],
+      [
+        -2.94,
+        2.94
+      ],
+      [
+        -2.94,
+        2.94
+      ],
+      [
+        -2.94,
+        2.94
+      ]
+    ],
+    "control_ranges_rad": [
+      [
+        -1.91986,
+        1.91986
+      ],
+      [
+        -1.74533,
+        1.74533
+      ],
+      [
+        -1.69,
+        1.69
+      ],
+      [
+        -1.65806,
+        1.65806
+      ],
+      [
+        -2.74385,
+        2.84121
+      ],
+      [
+        -0.17453,
+        1.74533
+      ]
+    ],
+    "pen_proxy_mass_kg": 0.0,
+    "actuator_gains_physically_calibrated": false
+  }
+}
