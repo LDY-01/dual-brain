@@ -23,6 +23,28 @@ This milestone does not implement speech recognition, model-generated answers,
 robot simulation, physical motion, ink pressure, or camera verification. A preview
 is a review of geometry, not evidence that a robot can follow that geometry.
 
+## Text Call Screen
+
+```powershell
+& '.\.venv\Scripts\python.exe' -X utf8 kwon_lab/tools/writing_chat.py --port 8765
+```
+
+Open `http://127.0.0.1:8765`. Submitting the Korean call `야` produces the fixed
+answer `네` and draws its strokes on the canvas. Other input is rejected; this is
+not model-generated conversation or speech recognition. A busy tab blocks new
+input. Stop, retry, completion, explicit errors, and job JSON download are supported.
+
+The app is loopback-only, uses no external API, and never sends robot commands.
+Its timestamps use KST; downloaded geometry retains motion-denied and
+calibration-required flags. History is limited to the current tab and is not
+persisted across reloads. Animation time and virtual paper dimensions are not
+physical measurements. See the [dated progress record](writing/README.md) for
+test results and screenshots. If the port is occupied, choose another `--port`.
+
+The default paper is A4 portrait, 210 by 297 mm, with 8 mm margins. The call
+response retains a 28 mm character cell. Canvas geometry uses the plan's paper
+dimensions; A4 paper size does not establish physical robot reachability.
+
 ## Run
 
 From the repository root in PowerShell:
@@ -50,7 +72,7 @@ Optional layout parameters:
 ```powershell
 & '.\.venv\Scripts\python.exe' -X utf8 kwon_lab/tools/writing_preview.py `
   --text '함께 시작해봐요.' `
-  --width-mm 160 --height-mm 100 --character-mm 18
+  --width-mm 210 --height-mm 297 --character-mm 18
 ```
 
 These dimensions describe a virtual paper area. They are not validated SO-101

@@ -16,8 +16,8 @@ from writing.preview import export_preview
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--text", required=True, help="One Korean sentence")
-    parser.add_argument("--width-mm", type=float, default=160)
-    parser.add_argument("--height-mm", type=float, default=100)
+    parser.add_argument("--width-mm", type=float, default=PaperSettings().width_mm)
+    parser.add_argument("--height-mm", type=float, default=PaperSettings().height_mm)
     parser.add_argument("--character-mm", type=float, default=18)
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()

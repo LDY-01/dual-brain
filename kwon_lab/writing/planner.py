@@ -11,8 +11,8 @@ from .strokes import glyph
 
 @dataclass(frozen=True)
 class PaperSettings:
-    width_mm: float = 160
-    height_mm: float = 100
+    width_mm: float = 210
+    height_mm: float = 297
     margin_mm: float = 8
     character_mm: float = 18
     character_gap_mm: float = 3

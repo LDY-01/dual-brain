@@ -8,10 +8,16 @@ import xml.etree.ElementTree as ET
 
 from kwon_lab.writing import PaperSettings, plan_text
 from kwon_lab.writing.preview import export_preview, to_svg
+from kwon_lab.writing.review import REVIEW_CASES, export_review
 from kwon_lab.writing.strokes import glyph
 
 
 class WritingTests(unittest.TestCase):
+    def test_default_paper_is_a4_portrait(self):
+        paper = PaperSettings()
+        self.assertEqual((paper.width_mm, paper.height_mm), (210, 297))
+        self.assertEqual(plan_text("네").paper, paper)
+
     def test_all_modern_hangul_have_finite_bounded_strokes(self):
         for codepoint in range(0xAC00, 0xD7A4):
             strokes = glyph(chr(codepoint))
@@ -78,8 +84,42 @@ class WritingTests(unittest.TestCase):
             paths = export_preview(plan, Path(directory))
             self.assertEqual(json.loads(paths["plan.json"].read_text(encoding="utf-8"))["text"], plan.text)
             with Image.open(paths["preview.png"]) as image:
-                self.assertEqual(image.size, (960, 600))
+                self.assertEqual(image.size, (1260, 1782))
                 self.assertTrue(all(low < high for low, high in image.getextrema()))
+
+    def test_review_samples_cover_glyph_structures_and_wrapping(self):
+        plans = {case_id: plan_text(text, paper) for case_id, text, paper in REVIEW_CASES}
+        self.assertEqual(plans["large_glyphs"].text, "가 한 글")
+        self.assertEqual(plans["large_glyphs"].paper.character_mm, 24)
+        self.assertEqual(plans["fixed_sentence"].text, "안녕하세요.")
+        self.assertGreater(plans["wrapped_sentence"].lines, 1)
+        for plan in plans.values():
+            self.assertFalse(plan.to_dict()["motion_authorized"])
+            self.assertTrue(plan.to_dict()["physical_calibration_required"])
+
+    def test_review_manifest_keeps_human_and_physical_validation_pending(self):
+        from datetime import datetime, timedelta
+        import json
+        from PIL import Image
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = json.loads(export_review(root).read_text(encoding="utf-8"))
+            self.assertEqual(manifest["milestone"], "M0")
+            self.assertEqual(manifest["human_review_status"], "pending")
+            self.assertEqual(manifest["physical_trials"], 0)
+            self.assertFalse(manifest["motion_authorized"])
+            self.assertTrue(manifest["physical_calibration_required"])
+            self.assertEqual(datetime.fromisoformat(manifest["generated_at"]).utcoffset(),
+                             timedelta(hours=9))
+            self.assertEqual(len(manifest["cases"]), len(REVIEW_CASES))
+            for case in manifest["cases"]:
+                self.assertEqual(case["human_review_status"], "pending")
+                self.assertEqual(len(case["files"]), 4)
+                for filename in case["files"].values():
+                    self.assertTrue((root / filename).is_file())
+                with Image.open(root / case["files"]["preview.png"]) as image:
+                    self.assertTrue(all(low < high for low, high in image.getextrema()))
 
 
 if __name__ == "__main__":

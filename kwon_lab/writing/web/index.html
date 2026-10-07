@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dual-Brain 필기</title>
+  <link rel="icon" href="/icons/pen-tool.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/app.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="header">
+    <div class="brand"><img src="/icons/pen-tool.svg" alt="" width="23" height="23"><h1>Dual-Brain <span>필기</span></h1></div>
+    <div class="connection">로봇 미연결</div>
+  </header>
+  <main class="workspace">
+    <section class="conversation" aria-labelledby="conversation-title">
+      <div class="section-heading"><h2 id="conversation-title">텍스트 호출</h2><span class="mode">고정 응답</span></div>
+      <div id="history" class="history" role="log" aria-label="호출 기록" aria-live="polite"><p id="empty-history">기록 없음</p></div>
+      <form id="call-form" class="composer">
+        <label for="call-input">호출어</label>
+        <div class="input-row"><input id="call-input" name="input" value="야" maxlength="120" autocomplete="off" required><button id="send" type="submit" class="send icon-button" aria-label="호출 보내기" title="호출 보내기"><img src="/icons/arrow-up.svg" alt=""></button></div>
+        <p id="error" role="alert"></p>
+      </form>
+    </section>
+    <section class="writing" aria-labelledby="writing-title">
+      <div class="section-heading"><h2 id="writing-title">필기</h2><span class="mode">화면 미리보기</span></div>
+      <div class="paper-toolbar"><span id="status" role="status" data-state="idle">대기</span><span id="paper-size" class="paper-size">210 × 297 mm · A4</span></div>
+      <div class="paper-area"><canvas id="paper" width="840" height="1188" aria-label="A4 한글 필기 미리보기"></canvas></div>
+      <div class="execution">
+        <div class="progress-label"><span id="stroke-progress">0 / 0 획</span><span id="elapsed">0.0초</span></div>
+        <progress id="progress" value="0" max="1" aria-label="필기 진행률"></progress>
+        <div class="controls"><button id="stop" class="icon-button" type="button" aria-label="필기 중지" title="필기 중지" disabled><img src="/icons/square.svg" alt=""></button><button id="replay" class="icon-button" type="button" aria-label="다시 쓰기" title="다시 쓰기" disabled><img src="/icons/rotate-ccw.svg" alt=""></button><button id="download" class="icon-button" type="button" aria-label="계획 JSON 내려받기" title="계획 JSON 내려받기" disabled><img src="/icons/download.svg" alt=""></button><span id="response-text" class="response-text"></span></div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
