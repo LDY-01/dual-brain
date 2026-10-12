@@ -1,0 +1,73 @@
+{
+  "format_version": 1,
+  "kind": "writing_execution_job",
+  "job_id": "7b955d9a949a4ee69659ff6fe81e8a3b",
+  "created_at": "2026-10-12T14:26:27.210832+09:00",
+  "started_at": "2026-10-12T14:26:27.227450+09:00",
+  "finished_at": "2026-10-12T14:26:28.493901+09:00",
+  "state": "failed",
+  "mode": "simulation_only",
+  "motion_authorized": false,
+  "physical_calibration_required": true,
+  "physical_dynamics_validated": false,
+  "pressure_validated": false,
+  "text": "빨간색",
+  "paper": {
+    "width_mm": 210,
+    "height_mm": 297,
+    "margin_mm": 8,
+    "character_mm": 18,
+    "character_gap_mm": 3,
+    "line_gap_mm": 6,
+    "pen_lift_mm": 8,
+    "sample_spacing_mm": 1
+  },
+  "total_strokes": 21,
+  "completed_strokes": 0,
+  "stroke_count_scope": "virtual_path_segments_not_ink_legibility",
+  "verification": "failed",
+  "human_review": {
+    "status": "unreviewed",
+    "scope": "simulation_trace_not_physical"
+  },
+  "stop_requested": false,
+  "stop_settled": false,
+  "failure": {
+    "reason": "reference_exceeds_actuator_control_range"
+  },
+  "wall_elapsed_s": 1.266,
+  "simulation_time_s": null,
+  "progress": {},
+  "placement": {
+    "page_id": "9ba52dd8b19a4d0fb81a2eaf916a9bfd",
+    "page_number": 3,
+    "reserved_rect_mm": [
+      8.0,
+      39.5,
+      150.0,
+      65.0
+    ],
+    "layout_rect_mm": [
+      11.75,
+      43.25,
+      146.25,
+      76.25
+    ],
+    "guard_mm": 3.75,
+    "lines": 1,
+    "config_signature": "5a8a732cf0c8b4908f95bd5d63019c2bf605afac15af2d4d384af34605f035d1",
+    "mode": "simulation_only",
+    "motion_authorized": false
+  },
+  "page_reservation_state": "released_no_motion",
+  "artifacts": [
+    "job.json",
+    "plan.json",
+    "config.json",
+    "events.jsonl",
+    "placement.json",
+    "report.json"
+  ],
+  "timeout_s": 120.0,
+  "stop_test_passed": false
+}

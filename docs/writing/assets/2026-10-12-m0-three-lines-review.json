@@ -1,0 +1,21 @@
+{
+  "created_at": "2026-10-12T16:03:08.315399+09:00",
+  "scope": "planned_geometry_preview_not_robot_execution",
+  "status": "positive_visual_feedback",
+  "reviewed_on": "2026-10-12",
+  "timezone": "Asia/Seoul",
+  "reviewer": "user",
+  "feedback": "완전 잘 알아볼 수 있을 거같아",
+  "expected_text_known": true,
+  "blind_review": false,
+  "readback": null,
+  "text_lines": [
+    "네",
+    "안녕하세요",
+    "반갑습니다"
+  ],
+  "character_mm": 28,
+  "motion_authorized": false,
+  "robot_path_checked": false,
+  "physical_writing_validated": false
+}

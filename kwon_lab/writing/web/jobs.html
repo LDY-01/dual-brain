@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dual-Brain 필기 실행</title>
+  <link rel="icon" href="/icons/pen-tool.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/jobs.css">
+  <script src="/jobs.js" defer></script>
+</head>
+<body>
+  <header><div class="brand"><img src="/icons/pen-tool.svg" alt=""><h1>Dual-Brain <span>필기 실행</span></h1></div><nav><a href="/">호출 화면</a><span class="tag">시뮬레이션 · 미보정</span></nav></header>
+  <main>
+    <section class="queue" aria-labelledby="queue-title">
+      <div class="section-title"><h2 id="queue-title">작업 기록</h2><span id="count">0건</span></div>
+      <form id="job-form">
+        <label for="text">고정 텍스트</label>
+        <div class="input-row"><input id="text" value="네" maxlength="120" required autocomplete="off"><button id="start" class="icon primary" title="시뮬레이션 실행" aria-label="시뮬레이션 실행"><img src="/icons/arrow-up.svg" alt=""></button></div>
+        <div class="size-row"><label for="character-mm">글자 크기</label><input id="character-mm" type="number" min="8" max="40" step="1" value="28" required><span>mm</span></div>
+      </form>
+      <p id="error" role="alert"></p>
+      <div class="sheet-heading"><h3>현재 종이</h3><span id="sheet-state" role="status">불러오는 중</span></div>
+      <div class="sheet-layout"><canvas id="page-map" width="1188" height="840" aria-label="A4 종이 사용 영역과 다음 배치 후보"></canvas><dl class="sheet-info"><div><dt>종이</dt><dd id="sheet-number">-</dd></div><div><dt>종이·배치 영역</dt><dd id="work-area">-</dd></div><div><dt>남은 높이</dt><dd id="remaining">-</dd></div><div><dt>다음 배치</dt><dd id="placement-status">-</dd></div></dl></div>
+      <div class="sheet-legend"><span class="occupied">사용 영역</span><span class="partial">부분 사용</span><span class="uncertain">확인 필요</span><span class="candidate">배치 후보</span></div>
+      <button id="new-page" class="new-page" type="button" disabled><img src="/icons/rotate-ccw.svg" alt="">새 종이 준비 완료</button>
+      <div class="record-table"><table><thead><tr><th>생성 시각 · KST</th><th>텍스트</th><th>상태</th></tr></thead><tbody id="jobs"></tbody></table><p id="empty">기록 없음</p></div>
+    </section>
+    <section class="detail" aria-labelledby="detail-title">
+      <div class="section-title"><h2 id="detail-title">실행 결과</h2><span id="state" role="status">대기</span></div>
+      <div class="detail-toolbar"><span id="job-text"></span><div class="actions"><button id="stop" class="icon" title="작업 중지 요청" aria-label="작업 중지 요청" disabled><img src="/icons/square.svg" alt=""></button><a id="download" class="icon disabled" title="결과 JSON 내려받기" aria-label="결과 JSON 내려받기"><img src="/icons/download.svg" alt=""></a></div></div>
+      <dl class="metrics"><div><dt>완료 획 · 가상</dt><dd id="strokes">-</dd></div><div><dt>물리 적분 시간</dt><dd id="simulation-time">-</dd></div><div><dt>실행 소요 시간</dt><dd id="wall-time">-</dd></div><div><dt>검증 상태</dt><dd id="verification">-</dd></div><div><dt>필기 위치</dt><dd id="position">-</dd></div><div><dt>영역 상태</dt><dd id="reservation-state">-</dd></div></dl>
+      <div class="trace-area"><div class="trace-heading"><span>A4 · 실제 가상 TCP 경로</span><span id="phase">-</span></div><div class="paper"><img id="trace" alt="물리 적분에서 기록한 붓끝 경로" hidden><span id="trace-empty">결과 대기</span></div></div>
+      <p id="failure"></p>
+      <div id="artifacts" class="artifacts"></div>
+      <form id="review-form"><h3>화면 가독성 검수</h3><div class="review-row"><select id="review-status" aria-label="가독성 판정" required><option value="">미검수</option><option value="pass">읽힘</option><option value="fail">읽기 어려움</option><option value="uncertain">불확실</option></select><input id="readback" maxlength="120" placeholder="판독한 내용" aria-label="판독한 내용"><button id="save-review" type="submit" disabled>검수 저장</button></div><p id="review-at"></p></form>
+    </section>
+  </main>
+</body>
+</html>

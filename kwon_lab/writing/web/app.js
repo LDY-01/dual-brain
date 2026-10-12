@@ -3,7 +3,7 @@
 const ui = Object.fromEntries(["call-form", "call-input", "send", "history", "error", "status", "paper", "paper-size", "stroke-progress", "elapsed", "progress", "stop", "replay", "download", "response-text"].map(id => [id, document.getElementById(id)]));
 const ctx = ui.paper.getContext("2d");
 const pixelsPerMm = 4;
-let paper = { width_mm: 210, height_mm: 297, margin_mm: 8 };
+let paper = { width_mm: 297, height_mm: 210, margin_mm: 8 };
 const labels = { idle: "대기", planning: "계획 생성 중", writing: "쓰는 중", completed: "완료", stopped: "중지됨", error: "실패" };
 let state = "idle", currentJob = null, lastJob = null, frame = 0, generation = 0;
 let controller = null, startedAt = 0, currentEntry = null;

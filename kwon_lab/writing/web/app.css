@@ -48,3 +48,5 @@ progress::-moz-progress-bar { background: #398c78; }
 @media (max-width: 760px) { .header { padding: 16px 20px; min-height: 68px; } h1 { font-size: 20px; } h1 span { font-size: 16px; } .workspace { grid-template-columns: 1fr; min-height: auto; } .conversation { border-right: 0; border-bottom: 1px solid #dedfe0; padding: 22px 20px 12px; } .history { min-height: 52px; max-height: 180px; margin-top: 8px; } #empty-history { margin: 16px 0; } .entry { padding: 12px 0; } .writing { padding: 22px 20px 28px; } .paper-toolbar { margin-top: 20px; } .connection { font-size: 11px; } }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }
 @media (max-width: 760px) { .paper-area { width: 100%; max-width: 420px; } }
+.paper-area { width: min(100%, max(297px, calc((100dvh - 340px) * 297 / 210))); }
+canvas { aspect-ratio: auto; }

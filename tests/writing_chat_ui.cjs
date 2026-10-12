@@ -33,8 +33,8 @@ const inkPixels = page => page.locator("#paper").evaluate(canvas => {
         const rect = canvas.getBoundingClientRect();
         return rect.width / rect.height;
       });
-      assert(Math.abs(ratio - 210 / 297) < .001, "A4 portrait aspect ratio is incorrect");
-      assert((await page.locator("#paper-size").textContent()).includes("210 × 297"));
+      assert(Math.abs(ratio - 297 / 210) < .001, "A4 landscape aspect ratio is incorrect");
+      assert((await page.locator("#paper-size").textContent()).includes("297 × 210"));
       assert.equal(await inkPixels(page), 0);
       await page.locator("#send").click();
       await state(page, "writing");
@@ -57,8 +57,8 @@ const inkPixels = page => page.locator("#paper").evaluate(canvas => {
       assert.equal(job.preview_result.status, "completed");
       assert.equal(job.plan.motion_authorized, false);
       assert.equal(job.plan.physical_calibration_required, true);
-      assert.equal(job.plan.paper.width_mm, 210);
-      assert.equal(job.plan.paper.height_mm, 297);
+      assert.equal(job.plan.paper.width_mm, 297);
+      assert.equal(job.plan.paper.height_mm, 210);
 
       await page.locator("#replay").click();
       await state(page, "writing");

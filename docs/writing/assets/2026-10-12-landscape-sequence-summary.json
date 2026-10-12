@@ -1,0 +1,726 @@
+{
+  "date": "2026-10-12",
+  "cases": [
+    {
+      "viewport": {
+        "width": 1280,
+        "height": 1000
+      },
+      "results": [
+        {
+          "job": {
+            "format_version": 1,
+            "kind": "writing_execution_job",
+            "job_id": "2aa721afda464d52ac59feafb1e24815",
+            "created_at": "2026-10-12T15:44:40.750123+09:00",
+            "started_at": "2026-10-12T15:44:40.775043+09:00",
+            "finished_at": "2026-10-12T15:44:50.066617+09:00",
+            "state": "completed",
+            "mode": "simulation_only",
+            "motion_authorized": false,
+            "physical_calibration_required": true,
+            "physical_dynamics_validated": false,
+            "pressure_validated": false,
+            "text": "네",
+            "paper": {
+              "width_mm": 297,
+              "height_mm": 210,
+              "margin_mm": 8,
+              "character_mm": 28,
+              "character_gap_mm": 3,
+              "line_gap_mm": 6,
+              "pen_lift_mm": 8,
+              "sample_spacing_mm": 1
+            },
+            "total_strokes": 4,
+            "completed_strokes": 4,
+            "stroke_count_scope": "virtual_path_segments_not_ink_legibility",
+            "verification": "passed_virtual_path",
+            "human_review": {
+              "status": "unreviewed",
+              "scope": "simulation_trace_not_physical"
+            },
+            "stop_requested": false,
+            "stop_settled": false,
+            "failure": null,
+            "failure_category": null,
+            "wall_elapsed_s": 9.297,
+            "simulation_time_s": 27.839999999998746,
+            "progress": {
+              "phase": "final_hold",
+              "simulation_steps": 5560,
+              "simulation_time_s": 27.799999999998754,
+              "reference_duration_s": 27.038526173867172,
+              "stroke": -1,
+              "op": "hold_ready"
+            },
+            "placement": {
+              "page_id": "a464f02341d245eabe6c8bcedf9d194b",
+              "page_number": 2,
+              "reserved_rect_mm": [
+                8,
+                8,
+                289,
+                43.5
+              ],
+              "layout_rect_mm": [
+                11.75,
+                11.75,
+                285.25,
+                198.25
+              ],
+              "guard_mm": 3.75,
+              "lines": 1,
+              "config_signature": "3cd285c075f3e2563dede7a70131bc795537de83e63ec2dcc585fc4d8ab57c73",
+              "mode": "simulation_only",
+              "motion_authorized": false
+            },
+            "page_reservation_state": "occupied",
+            "artifacts": [
+              "job.json",
+              "plan.json",
+              "config.json",
+              "events.jsonl",
+              "placement.json",
+              "report.json",
+              "trace.png"
+            ],
+            "timeout_s": 120,
+            "stop_test_passed": false
+          },
+          "metrics": {
+            "simulation_time_s": 27.839999999998746,
+            "tracking_mm": 0.4414320289070605,
+            "path_mm": 0.84711940223579,
+            "tip_speed_mm_s": 20.905785498340258
+          }
+        },
+        {
+          "job": {
+            "format_version": 1,
+            "kind": "writing_execution_job",
+            "job_id": "02d0d02bb8d84a9bb27aa632177b7f7c",
+            "created_at": "2026-10-12T15:44:50.344351+09:00",
+            "started_at": "2026-10-12T15:44:50.384351+09:00",
+            "finished_at": "2026-10-12T15:45:14.476977+09:00",
+            "state": "completed",
+            "mode": "simulation_only",
+            "motion_authorized": false,
+            "physical_calibration_required": true,
+            "physical_dynamics_validated": false,
+            "pressure_validated": false,
+            "text": "안녕하세요",
+            "paper": {
+              "width_mm": 297,
+              "height_mm": 210,
+              "margin_mm": 8,
+              "character_mm": 28,
+              "character_gap_mm": 3,
+              "line_gap_mm": 6,
+              "pen_lift_mm": 8,
+              "sample_spacing_mm": 1
+            },
+            "total_strokes": 23,
+            "completed_strokes": 23,
+            "stroke_count_scope": "virtual_path_segments_not_ink_legibility",
+            "verification": "passed_virtual_path",
+            "human_review": {
+              "status": "unreviewed",
+              "scope": "simulation_trace_not_physical"
+            },
+            "stop_requested": false,
+            "stop_settled": false,
+            "failure": null,
+            "failure_category": null,
+            "wall_elapsed_s": 24.094,
+            "simulation_time_s": 124.17499999995955,
+            "progress": {
+              "phase": "final_hold",
+              "simulation_steps": 24820,
+              "simulation_time_s": 124.09999999995962,
+              "reference_duration_s": 123.37047649638993,
+              "stroke": -1,
+              "op": "hold_ready"
+            },
+            "placement": {
+              "page_id": "a464f02341d245eabe6c8bcedf9d194b",
+              "page_number": 2,
+              "reserved_rect_mm": [
+                8,
+                49.5,
+                289,
+                85
+              ],
+              "layout_rect_mm": [
+                11.75,
+                53.25,
+                285.25,
+                198.25
+              ],
+              "guard_mm": 3.75,
+              "lines": 1,
+              "config_signature": "3cd285c075f3e2563dede7a70131bc795537de83e63ec2dcc585fc4d8ab57c73",
+              "mode": "simulation_only",
+              "motion_authorized": false
+            },
+            "page_reservation_state": "occupied",
+            "artifacts": [
+              "job.json",
+              "plan.json",
+              "config.json",
+              "events.jsonl",
+              "placement.json",
+              "report.json",
+              "trace.png"
+            ],
+            "timeout_s": 120,
+            "stop_test_passed": false
+          },
+          "metrics": {
+            "simulation_time_s": 124.17499999995955,
+            "tracking_mm": 0.44075205531336326,
+            "path_mm": 0.8807981577605886,
+            "tip_speed_mm_s": 25.757151674684437
+          }
+        }
+      ],
+      "actual_ink_pixels": 3191,
+      "third_row_rejected": {
+        "format_version": 1,
+        "kind": "writing_execution_job",
+        "job_id": "6bc0503c9d454b95b9c7cbf6a79ecfa8",
+        "created_at": "2026-10-12T15:45:15.475600+09:00",
+        "started_at": "2026-10-12T15:45:15.485499+09:00",
+        "finished_at": "2026-10-12T15:45:15.783009+09:00",
+        "state": "failed",
+        "mode": "simulation_only",
+        "motion_authorized": false,
+        "physical_calibration_required": true,
+        "physical_dynamics_validated": false,
+        "pressure_validated": false,
+        "text": "네",
+        "paper": {
+          "width_mm": 297,
+          "height_mm": 210,
+          "margin_mm": 8,
+          "character_mm": 28,
+          "character_gap_mm": 3,
+          "line_gap_mm": 6,
+          "pen_lift_mm": 8,
+          "sample_spacing_mm": 1
+        },
+        "total_strokes": 4,
+        "completed_strokes": 0,
+        "stroke_count_scope": "virtual_path_segments_not_ink_legibility",
+        "verification": "failed",
+        "human_review": {
+          "status": "unreviewed",
+          "scope": "simulation_trace_not_physical"
+        },
+        "stop_requested": false,
+        "stop_settled": false,
+        "failure": {
+          "reason": "preflight_not_passed",
+          "detail": {
+            "reason": "ik_not_converged",
+            "point_mm": [
+              17.015734438789266,
+              96.15394479792701,
+              16.178335187406
+            ],
+            "phase": "approach",
+            "position_error_mm": 0.872992366288409,
+            "angle_error_deg": 0.19353187424841148
+          }
+        },
+        "failure_category": "robot_reach",
+        "wall_elapsed_s": 0.296,
+        "simulation_time_s": null,
+        "progress": {},
+        "placement": {
+          "page_id": "a464f02341d245eabe6c8bcedf9d194b",
+          "page_number": 2,
+          "reserved_rect_mm": [
+            8,
+            91,
+            289,
+            126.5
+          ],
+          "layout_rect_mm": [
+            11.75,
+            94.75,
+            285.25,
+            198.25
+          ],
+          "guard_mm": 3.75,
+          "lines": 1,
+          "config_signature": "3cd285c075f3e2563dede7a70131bc795537de83e63ec2dcc585fc4d8ab57c73",
+          "mode": "simulation_only",
+          "motion_authorized": false
+        },
+        "page_reservation_state": "released_no_motion",
+        "artifacts": [
+          "job.json",
+          "plan.json",
+          "config.json",
+          "events.jsonl",
+          "placement.json",
+          "report.json"
+        ],
+        "timeout_s": 120,
+        "stop_test_passed": false
+      },
+      "page": {
+        "page_id": "a464f02341d245eabe6c8bcedf9d194b",
+        "number": 2,
+        "created_at": "2026-10-12T15:44:40.602696+09:00",
+        "state": "ready",
+        "reason": null,
+        "paper": {
+          "width_mm": 297,
+          "height_mm": 210,
+          "margin_mm": 8,
+          "character_mm": 18,
+          "character_gap_mm": 3,
+          "line_gap_mm": 6,
+          "pen_lift_mm": 8,
+          "sample_spacing_mm": 1
+        },
+        "working_rect_mm": [
+          8,
+          8,
+          289,
+          202
+        ],
+        "guard_mm": 3.75,
+        "row_gap_mm": 6,
+        "next_row_y_mm": 91,
+        "config_signature": "3cd285c075f3e2563dede7a70131bc795537de83e63ec2dcc585fc4d8ab57c73",
+        "reservations": [
+          {
+            "job_id": "2aa721afda464d52ac59feafb1e24815",
+            "reserved_rect_mm": [
+              8,
+              8,
+              289,
+              43.5
+            ],
+            "state": "occupied",
+            "created_at": "2026-10-12T15:44:40.750123+09:00",
+            "reason": "virtual_trajectory_completed",
+            "finished_at": "2026-10-12T15:44:50.066617+09:00"
+          },
+          {
+            "job_id": "02d0d02bb8d84a9bb27aa632177b7f7c",
+            "reserved_rect_mm": [
+              8,
+              49.5,
+              289,
+              85
+            ],
+            "state": "occupied",
+            "created_at": "2026-10-12T15:44:50.344351+09:00",
+            "reason": "virtual_trajectory_completed",
+            "finished_at": "2026-10-12T15:45:14.476977+09:00"
+          },
+          {
+            "job_id": "6bc0503c9d454b95b9c7cbf6a79ecfa8",
+            "reserved_rect_mm": [
+              8,
+              91,
+              289,
+              126.5
+            ],
+            "state": "released_no_motion",
+            "created_at": "2026-10-12T15:45:15.475600+09:00",
+            "reason": "preflight_confirmed_no_motion",
+            "finished_at": "2026-10-12T15:45:15.783009+09:00"
+          }
+        ],
+        "motion_authorized": false,
+        "physical_calibration_required": true,
+        "confirmation": "human_confirmed_new_sheet_no_automatic_detection",
+        "archived_pages": 1,
+        "remaining_height_mm": 111,
+        "robot_candidate_rect_mm": [
+          8,
+          8,
+          289,
+          202
+        ],
+        "requested_paper": {
+          "width_mm": 297,
+          "height_mm": 210,
+          "margin_mm": 8,
+          "character_mm": 18,
+          "character_gap_mm": 3,
+          "line_gap_mm": 6,
+          "pen_lift_mm": 8,
+          "sample_spacing_mm": 1
+        },
+        "layout_scope": "paper_margins_not_robot_reach"
+      }
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "results": [
+        {
+          "job": {
+            "format_version": 1,
+            "kind": "writing_execution_job",
+            "job_id": "5c37b1a353ed4561b117fadb80c118f9",
+            "created_at": "2026-10-12T15:45:17.262311+09:00",
+            "started_at": "2026-10-12T15:45:17.291327+09:00",
+            "finished_at": "2026-10-12T15:45:22.899044+09:00",
+            "state": "completed",
+            "mode": "simulation_only",
+            "motion_authorized": false,
+            "physical_calibration_required": true,
+            "physical_dynamics_validated": false,
+            "pressure_validated": false,
+            "text": "네",
+            "paper": {
+              "width_mm": 297,
+              "height_mm": 210,
+              "margin_mm": 8,
+              "character_mm": 28,
+              "character_gap_mm": 3,
+              "line_gap_mm": 6,
+              "pen_lift_mm": 8,
+              "sample_spacing_mm": 1
+            },
+            "total_strokes": 4,
+            "completed_strokes": 4,
+            "stroke_count_scope": "virtual_path_segments_not_ink_legibility",
+            "verification": "passed_virtual_path",
+            "human_review": {
+              "status": "unreviewed",
+              "scope": "simulation_trace_not_physical"
+            },
+            "stop_requested": false,
+            "stop_settled": false,
+            "failure": null,
+            "failure_category": null,
+            "wall_elapsed_s": 5.61,
+            "simulation_time_s": 27.839999999998746,
+            "progress": {
+              "phase": "final_hold",
+              "simulation_steps": 5560,
+              "simulation_time_s": 27.799999999998754,
+              "reference_duration_s": 27.038526173867172,
+              "stroke": -1,
+              "op": "hold_ready"
+            },
+            "placement": {
+              "page_id": "b34edfd176c44df4b2e1e4b587e2bd4d",
+              "page_number": 3,
+              "reserved_rect_mm": [
+                8,
+                8,
+                289,
+                43.5
+              ],
+              "layout_rect_mm": [
+                11.75,
+                11.75,
+                285.25,
+                198.25
+              ],
+              "guard_mm": 3.75,
+              "lines": 1,
+              "config_signature": "3cd285c075f3e2563dede7a70131bc795537de83e63ec2dcc585fc4d8ab57c73",
+              "mode": "simulation_only",
+              "motion_authorized": false
+            },
+            "page_reservation_state": "occupied",
+            "artifacts": [
+              "job.json",
+              "plan.json",
+              "config.json",
+              "events.jsonl",
+              "placement.json",
+              "report.json",
+              "trace.png"
+            ],
+            "timeout_s": 120,
+            "stop_test_passed": false
+          },
+          "metrics": {
+            "simulation_time_s": 27.839999999998746,
+            "tracking_mm": 0.4414320289070605,
+            "path_mm": 0.84711940223579,
+            "tip_speed_mm_s": 20.905785498340258
+          }
+        },
+        {
+          "job": {
+            "format_version": 1,
+            "kind": "writing_execution_job",
+            "job_id": "2aa18de27717413a98fa9e7fc9d434d9",
+            "created_at": "2026-10-12T15:45:23.156654+09:00",
+            "started_at": "2026-10-12T15:45:23.181926+09:00",
+            "finished_at": "2026-10-12T15:45:43.357029+09:00",
+            "state": "completed",
+            "mode": "simulation_only",
+            "motion_authorized": false,
+            "physical_calibration_required": true,
+            "physical_dynamics_validated": false,
+            "pressure_validated": false,
+            "text": "안녕하세요",
+            "paper": {
+              "width_mm": 297,
+              "height_mm": 210,
+              "margin_mm": 8,
+              "character_mm": 28,
+              "character_gap_mm": 3,
+              "line_gap_mm": 6,
+              "pen_lift_mm": 8,
+              "sample_spacing_mm": 1
+            },
+            "total_strokes": 23,
+            "completed_strokes": 23,
+            "stroke_count_scope": "virtual_path_segments_not_ink_legibility",
+            "verification": "passed_virtual_path",
+            "human_review": {
+              "status": "unreviewed",
+              "scope": "simulation_trace_not_physical"
+            },
+            "stop_requested": false,
+            "stop_settled": false,
+            "failure": null,
+            "failure_category": null,
+            "wall_elapsed_s": 20.188,
+            "simulation_time_s": 124.17499999995955,
+            "progress": {
+              "phase": "final_hold",
+              "simulation_steps": 24820,
+              "simulation_time_s": 124.09999999995962,
+              "reference_duration_s": 123.37047649638993,
+              "stroke": -1,
+              "op": "hold_ready"
+            },
+            "placement": {
+              "page_id": "b34edfd176c44df4b2e1e4b587e2bd4d",
+              "page_number": 3,
+              "reserved_rect_mm": [
+                8,
+                49.5,
+                289,
+                85
+              ],
+              "layout_rect_mm": [
+                11.75,
+                53.25,
+                285.25,
+                198.25
+              ],
+              "guard_mm": 3.75,
+              "lines": 1,
+              "config_signature": "3cd285c075f3e2563dede7a70131bc795537de83e63ec2dcc585fc4d8ab57c73",
+              "mode": "simulation_only",
+              "motion_authorized": false
+            },
+            "page_reservation_state": "occupied",
+            "artifacts": [
+              "job.json",
+              "plan.json",
+              "config.json",
+              "events.jsonl",
+              "placement.json",
+              "report.json",
+              "trace.png"
+            ],
+            "timeout_s": 120,
+            "stop_test_passed": false
+          },
+          "metrics": {
+            "simulation_time_s": 124.17499999995955,
+            "tracking_mm": 0.44075205531336326,
+            "path_mm": 0.8807981577605886,
+            "tip_speed_mm_s": 25.757151674684437
+          }
+        }
+      ],
+      "actual_ink_pixels": 3191,
+      "third_row_rejected": {
+        "format_version": 1,
+        "kind": "writing_execution_job",
+        "job_id": "fecb7ed3689142e485c79ab26cc2324d",
+        "created_at": "2026-10-12T15:45:44.314124+09:00",
+        "started_at": "2026-10-12T15:45:44.329473+09:00",
+        "finished_at": "2026-10-12T15:45:44.648203+09:00",
+        "state": "failed",
+        "mode": "simulation_only",
+        "motion_authorized": false,
+        "physical_calibration_required": true,
+        "physical_dynamics_validated": false,
+        "pressure_validated": false,
+        "text": "네",
+        "paper": {
+          "width_mm": 297,
+          "height_mm": 210,
+          "margin_mm": 8,
+          "character_mm": 28,
+          "character_gap_mm": 3,
+          "line_gap_mm": 6,
+          "pen_lift_mm": 8,
+          "sample_spacing_mm": 1
+        },
+        "total_strokes": 4,
+        "completed_strokes": 0,
+        "stroke_count_scope": "virtual_path_segments_not_ink_legibility",
+        "verification": "failed",
+        "human_review": {
+          "status": "unreviewed",
+          "scope": "simulation_trace_not_physical"
+        },
+        "stop_requested": false,
+        "stop_settled": false,
+        "failure": {
+          "reason": "preflight_not_passed",
+          "detail": {
+            "reason": "ik_not_converged",
+            "point_mm": [
+              17.015734438789266,
+              96.15394479792701,
+              16.178335187406
+            ],
+            "phase": "approach",
+            "position_error_mm": 0.872992366288409,
+            "angle_error_deg": 0.19353187424841148
+          }
+        },
+        "failure_category": "robot_reach",
+        "wall_elapsed_s": 0.313,
+        "simulation_time_s": null,
+        "progress": {},
+        "placement": {
+          "page_id": "b34edfd176c44df4b2e1e4b587e2bd4d",
+          "page_number": 3,
+          "reserved_rect_mm": [
+            8,
+            91,
+            289,
+            126.5
+          ],
+          "layout_rect_mm": [
+            11.75,
+            94.75,
+            285.25,
+            198.25
+          ],
+          "guard_mm": 3.75,
+          "lines": 1,
+          "config_signature": "3cd285c075f3e2563dede7a70131bc795537de83e63ec2dcc585fc4d8ab57c73",
+          "mode": "simulation_only",
+          "motion_authorized": false
+        },
+        "page_reservation_state": "released_no_motion",
+        "artifacts": [
+          "job.json",
+          "plan.json",
+          "config.json",
+          "events.jsonl",
+          "placement.json",
+          "report.json"
+        ],
+        "timeout_s": 120,
+        "stop_test_passed": false
+      },
+      "page": {
+        "page_id": "b34edfd176c44df4b2e1e4b587e2bd4d",
+        "number": 3,
+        "created_at": "2026-10-12T15:45:16.859679+09:00",
+        "state": "ready",
+        "reason": null,
+        "paper": {
+          "width_mm": 297,
+          "height_mm": 210,
+          "margin_mm": 8,
+          "character_mm": 18,
+          "character_gap_mm": 3,
+          "line_gap_mm": 6,
+          "pen_lift_mm": 8,
+          "sample_spacing_mm": 1
+        },
+        "working_rect_mm": [
+          8,
+          8,
+          289,
+          202
+        ],
+        "guard_mm": 3.75,
+        "row_gap_mm": 6,
+        "next_row_y_mm": 91,
+        "config_signature": "3cd285c075f3e2563dede7a70131bc795537de83e63ec2dcc585fc4d8ab57c73",
+        "reservations": [
+          {
+            "job_id": "5c37b1a353ed4561b117fadb80c118f9",
+            "reserved_rect_mm": [
+              8,
+              8,
+              289,
+              43.5
+            ],
+            "state": "occupied",
+            "created_at": "2026-10-12T15:45:17.262311+09:00",
+            "reason": "virtual_trajectory_completed",
+            "finished_at": "2026-10-12T15:45:22.899044+09:00"
+          },
+          {
+            "job_id": "2aa18de27717413a98fa9e7fc9d434d9",
+            "reserved_rect_mm": [
+              8,
+              49.5,
+              289,
+              85
+            ],
+            "state": "occupied",
+            "created_at": "2026-10-12T15:45:23.156654+09:00",
+            "reason": "virtual_trajectory_completed",
+            "finished_at": "2026-10-12T15:45:43.357029+09:00"
+          },
+          {
+            "job_id": "fecb7ed3689142e485c79ab26cc2324d",
+            "reserved_rect_mm": [
+              8,
+              91,
+              289,
+              126.5
+            ],
+            "state": "released_no_motion",
+            "created_at": "2026-10-12T15:45:44.314124+09:00",
+            "reason": "preflight_confirmed_no_motion",
+            "finished_at": "2026-10-12T15:45:44.648203+09:00"
+          }
+        ],
+        "motion_authorized": false,
+        "physical_calibration_required": true,
+        "confirmation": "human_confirmed_new_sheet_no_automatic_detection",
+        "archived_pages": 2,
+        "remaining_height_mm": 111,
+        "robot_candidate_rect_mm": [
+          8,
+          8,
+          289,
+          202
+        ],
+        "requested_paper": {
+          "width_mm": 297,
+          "height_mm": 210,
+          "margin_mm": 8,
+          "character_mm": 18,
+          "character_gap_mm": 3,
+          "line_gap_mm": 6,
+          "pen_lift_mm": 8,
+          "sample_spacing_mm": 1
+        },
+        "layout_scope": "paper_margins_not_robot_reach"
+      }
+    }
+  ],
+  "browser_errors": []
+}

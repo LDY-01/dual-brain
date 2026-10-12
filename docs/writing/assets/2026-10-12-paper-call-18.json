@@ -1,0 +1,79 @@
+{
+  "format_version": 1,
+  "kind": "writing_execution_job",
+  "job_id": "a52077f42e954d508f0ae478b9594737",
+  "created_at": "2026-10-12T14:26:24.000481+09:00",
+  "started_at": "2026-10-12T14:26:24.013734+09:00",
+  "finished_at": "2026-10-12T14:26:27.208751+09:00",
+  "state": "completed",
+  "mode": "simulation_only",
+  "motion_authorized": false,
+  "physical_calibration_required": true,
+  "physical_dynamics_validated": false,
+  "pressure_validated": false,
+  "text": "네",
+  "paper": {
+    "width_mm": 210,
+    "height_mm": 297,
+    "margin_mm": 8,
+    "character_mm": 18,
+    "character_gap_mm": 3,
+    "line_gap_mm": 6,
+    "pen_lift_mm": 8,
+    "sample_spacing_mm": 1
+  },
+  "total_strokes": 4,
+  "completed_strokes": 4,
+  "stroke_count_scope": "virtual_path_segments_not_ink_legibility",
+  "verification": "passed_virtual_path",
+  "human_review": {
+    "status": "unreviewed",
+    "scope": "simulation_trace_not_physical"
+  },
+  "stop_requested": false,
+  "stop_settled": false,
+  "failure": null,
+  "wall_elapsed_s": 3.187,
+  "simulation_time_s": 18.860000000000532,
+  "progress": {
+    "phase": "final_hold",
+    "simulation_steps": 3760,
+    "simulation_time_s": 18.800000000000544,
+    "reference_duration_s": 18.056902353657268,
+    "stroke": -1,
+    "op": "hold_ready"
+  },
+  "placement": {
+    "page_id": "9ba52dd8b19a4d0fb81a2eaf916a9bfd",
+    "page_number": 3,
+    "reserved_rect_mm": [
+      8.0,
+      8.0,
+      150.0,
+      33.5
+    ],
+    "layout_rect_mm": [
+      11.75,
+      11.75,
+      146.25,
+      76.25
+    ],
+    "guard_mm": 3.75,
+    "lines": 1,
+    "config_signature": "5a8a732cf0c8b4908f95bd5d63019c2bf605afac15af2d4d384af34605f035d1",
+    "mode": "simulation_only",
+    "motion_authorized": false
+  },
+  "page_reservation_state": "occupied",
+  "artifacts": [
+    "job.json",
+    "plan.json",
+    "config.json",
+    "events.jsonl",
+    "placement.json",
+    "report.json",
+    "trace.png"
+  ],
+  "timeout_s": 120.0,
+  "stop_test_passed": false
+}

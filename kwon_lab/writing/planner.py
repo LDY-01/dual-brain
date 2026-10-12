@@ -9,6 +9,10 @@ import unicodedata
 from .strokes import glyph
 
 
+class LayoutSpaceError(ValueError):
+    """Valid text cannot fit the requested paper layout."""
+
+
 @dataclass(frozen=True)
 class PaperSettings:
     width_mm: float = 210
@@ -94,7 +98,7 @@ def _resample(points: list[tuple[float, float]], spacing: float) -> tuple[tuple[
     return tuple(sampled)
 
 
-def plan_text(text: str, paper: PaperSettings | None = None) -> WritingPlan:
+def plan_text(text: str, paper: PaperSettings | None = None, layout_rect_mm=None) -> WritingPlan:
     paper = paper or PaperSettings()
     paper.validate()
     if not isinstance(text, str):
@@ -106,12 +110,24 @@ def plan_text(text: str, paper: PaperSettings | None = None) -> WritingPlan:
         raise ValueError("text must contain 1 to 120 characters")
     # Resolve every glyph before planning, so an unsupported suffix cannot yield a partial job.
     shapes = [glyph(char) for char in text]
-    usable_width = paper.width_mm - 2 * paper.margin_mm
-    usable_height = paper.height_mm - 2 * paper.margin_mm
+    left, top, right, bottom = paper.margin_mm, paper.margin_mm, paper.width_mm - paper.margin_mm, paper.height_mm - paper.margin_mm
+    if layout_rect_mm is not None:
+        if not isinstance(layout_rect_mm, (tuple, list)) or len(layout_rect_mm) != 4:
+            raise ValueError("layout_rect_mm must contain four finite numbers")
+        if any(isinstance(v, bool) or not isinstance(v, (int, float)) or not isfinite(v) for v in layout_rect_mm):
+            raise ValueError("layout_rect_mm must contain four finite numbers")
+        left, top, right, bottom = layout_rect_mm
+        if not (paper.margin_mm <= left < right <= paper.width_mm - paper.margin_mm
+                and paper.margin_mm <= top < bottom <= paper.height_mm - paper.margin_mm):
+            raise ValueError("layout_rect_mm must fit inside paper margins")
+    usable_width = right - left
+    usable_height = bottom - top
     pitch_x = paper.character_mm + paper.character_gap_mm
     pitch_y = paper.character_mm + paper.line_gap_mm
     columns = int((usable_width + paper.character_gap_mm) // pitch_x)
     rows = int((usable_height + paper.line_gap_mm) // pitch_y)
+    if columns < 1 or rows < 1:
+        raise LayoutSpaceError("A character does not fit inside the layout area")
     strokes = []
     column = row = 0
     for index, (char, shape) in enumerate(zip(text, shapes)):
@@ -121,17 +137,16 @@ def plan_text(text: str, paper: PaperSettings | None = None) -> WritingPlan:
             if char == " ":
                 continue
         if row >= rows:
-            raise ValueError("Text exceeds the paper area; shorten it or increase the preview area")
-        x0 = paper.margin_mm + column * pitch_x
-        y0 = paper.margin_mm + row * pitch_y
+            raise LayoutSpaceError("Text exceeds the paper area; shorten it or increase the preview area")
+        x0 = left + column * pitch_x
+        y0 = top + row * pitch_y
         for stroke in shape:
             points = [(x0 + x * paper.character_mm, y0 + y * paper.character_mm)
                       for x, y in stroke]
             sampled = _resample(points, paper.sample_spacing_mm)
             for x, y in sampled:
-                if not (paper.margin_mm <= x <= paper.width_mm - paper.margin_mm
-                        and paper.margin_mm <= y <= paper.height_mm - paper.margin_mm):
-                    raise ValueError("A stroke crosses the paper margin")
+                if not (left <= x <= right and top <= y <= bottom):
+                    raise ValueError("A stroke crosses the layout area")
             strokes.append(PenStroke(char, index, sampled))
         column += 1
     return WritingPlan(text, paper, tuple(strokes), row + 1)

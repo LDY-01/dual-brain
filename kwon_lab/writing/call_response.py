@@ -13,7 +13,7 @@ def plan_call(text: str) -> dict:
     normalized = unicodedata.normalize("NFC", text).strip()
     if normalized != "야":
         raise ValueError("현재 지원하는 호출어는 ‘야’입니다.")
-    plan = plan_text("네", PaperSettings(character_mm=28))
+    plan = plan_text("네", PaperSettings(width_mm=297, height_mm=210, character_mm=28))
     return {
         "job_id": str(uuid4()),
         "created_at": datetime.now(timezone(timedelta(hours=9))).isoformat(),

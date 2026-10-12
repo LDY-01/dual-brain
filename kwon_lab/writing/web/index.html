@@ -11,7 +11,7 @@
 <body>
   <header class="header">
     <div class="brand"><img src="/icons/pen-tool.svg" alt="" width="23" height="23"><h1>Dual-Brain <span>필기</span></h1></div>
-    <div class="connection">로봇 미연결</div>
+    <div class="connection"><a href="/jobs">실행 기록</a> · 로봇 미연결</div>
   </header>
   <main class="workspace">
     <section class="conversation" aria-labelledby="conversation-title">
@@ -25,8 +25,8 @@
     </section>
     <section class="writing" aria-labelledby="writing-title">
       <div class="section-heading"><h2 id="writing-title">필기</h2><span class="mode">화면 미리보기</span></div>
-      <div class="paper-toolbar"><span id="status" role="status" data-state="idle">대기</span><span id="paper-size" class="paper-size">210 × 297 mm · A4</span></div>
-      <div class="paper-area"><canvas id="paper" width="840" height="1188" aria-label="A4 한글 필기 미리보기"></canvas></div>
+      <div class="paper-toolbar"><span id="status" role="status" data-state="idle">대기</span><span id="paper-size" class="paper-size">297 × 210 mm · A4 가로</span></div>
+      <div class="paper-area"><canvas id="paper" width="1188" height="840" aria-label="A4 가로 한글 필기 미리보기"></canvas></div>
       <div class="execution">
         <div class="progress-label"><span id="stroke-progress">0 / 0 획</span><span id="elapsed">0.0초</span></div>
         <progress id="progress" value="0" max="1" aria-label="필기 진행률"></progress>

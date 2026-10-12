@@ -1,0 +1,519 @@
+{
+  "created_at": "2026-10-12T15:39:28.237207+09:00",
+  "kind": "writing_virtual_condition_evaluation",
+  "mode": "simulation_only",
+  "ready_pose_policy": "unchanged_baseline_joints_revalidated_per_condition",
+  "settings": {
+    "position_tolerance_mm": 0.75,
+    "angle_tolerance_deg": 3.0,
+    "cartesian_step_mm": 1.0,
+    "max_joint_step_rad": 0.04,
+    "joint_speed_rad_s": 0.5,
+    "tip_speed_mm_s": 20.0,
+    "max_points": 20000,
+    "ik_iterations": 200
+  },
+  "dynamics_settings": {
+    "timestep_s": 0.005,
+    "time_scale": 2.0,
+    "settle_s": 0.5,
+    "final_hold_s": 0.3,
+    "tracking_tolerance_mm": 1.0,
+    "joint_tracking_tolerance_rad": 0.02,
+    "max_joint_speed_rad_s": 0.75,
+    "max_tip_speed_mm_s": 30.0,
+    "stop_timeout_s": 1.0,
+    "stop_stable_s": 0.1,
+    "stop_joint_speed_rad_s": 0.02,
+    "stop_tip_speed_mm_s": 2.0,
+    "max_stop_displacement_mm": 2.0,
+    "max_steps": 40000
+  },
+  "motion_authorized": false,
+  "physical_calibration_required": true,
+  "physical_dynamics_validated": false,
+  "pressure_validated": false,
+  "profiles": {
+    "full_a4_origin_160_-70mm": {
+      "tool": {
+        "profile_id": "virtual-x-axis-60mm-v1",
+        "tip_offset_m": [
+          0.06,
+          0.0,
+          0.0
+        ],
+        "axis_local": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "shaft_length_m": 0.145,
+        "shaft_radius_m": 0.00625,
+        "nib_length_m": 0.01,
+        "nib_radius_m": 0.0005,
+        "gripper_rad": 0.1,
+        "simulation_only": true,
+        "calibrated": false
+      },
+      "paper_frame": {
+        "origin_m": [
+          0.16,
+          -0.07,
+          0.005
+        ],
+        "x_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "y_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "working_rect_mm": [
+          8.0,
+          8.0,
+          289.0,
+          202.0
+        ]
+      },
+      "transit": {
+        "ready_q_rad": [
+          0.0992351067,
+          -0.2717824768,
+          0.2524989785,
+          1.5859414678,
+          -0.1334262657
+        ],
+        "travel_height_mm": 16.0,
+        "minimum_clearance_mm": 12.0
+      },
+      "cases": {
+        "upper_left": {
+          "text": "네",
+          "paper": {
+            "width_mm": 297,
+            "height_mm": 210,
+            "margin_mm": 8,
+            "character_mm": 28,
+            "character_gap_mm": 3,
+            "line_gap_mm": 6,
+            "pen_lift_mm": 8,
+            "sample_spacing_mm": 1
+          },
+          "kind": "writing_dynamics_rollout",
+          "status": "passed",
+          "phase": "complete",
+          "failure": null,
+          "trajectory_complete": true,
+          "simulation_steps": 5568,
+          "actual_simulated_duration_s": 27.839999999998746,
+          "max_tracking_error_mm": 0.4414320289070605,
+          "max_path_error_mm": 0.84711940223579,
+          "max_tip_speed_mm_s": 20.905785498340258,
+          "max_joint_speed_rad_s": 0.20914928916886455,
+          "dynamics_validated": true,
+          "motion_authorized": false,
+          "physical_calibration_required": true,
+          "physical_dynamics_validated": false,
+          "pressure_validated": false,
+          "stop_test_passed": false,
+          "preflight": {
+            "status": "passed",
+            "scope": "full_cycle",
+            "failure": null,
+            "approach_validated": true,
+            "departure_validated": true,
+            "ready_return_validated": true,
+            "max_position_error_mm": 0.4325733250004254,
+            "simulated_duration_s": 13.519263086933586
+          }
+        },
+        "upper_right": {
+          "text": "네",
+          "paper": {
+            "width_mm": 297,
+            "height_mm": 210,
+            "margin_mm": 8,
+            "character_mm": 28,
+            "character_gap_mm": 3,
+            "line_gap_mm": 6,
+            "pen_lift_mm": 8,
+            "sample_spacing_mm": 1
+          },
+          "kind": "writing_dynamics_rollout",
+          "status": "rejected",
+          "phase": "preflight",
+          "failure": {
+            "reason": "preflight_not_passed",
+            "detail": {
+              "reason": "ik_not_converged",
+              "point_mm": [
+                244.33706188412236,
+                18.397782043967048,
+                16.178335187406
+              ],
+              "phase": "approach",
+              "position_error_mm": 0.8868742293195653,
+              "angle_error_deg": 0.30814521417106855
+            }
+          },
+          "trajectory_complete": false,
+          "simulation_steps": null,
+          "actual_simulated_duration_s": null,
+          "max_tracking_error_mm": null,
+          "max_path_error_mm": null,
+          "max_tip_speed_mm_s": null,
+          "max_joint_speed_rad_s": null,
+          "dynamics_validated": false,
+          "motion_authorized": false,
+          "physical_calibration_required": true,
+          "physical_dynamics_validated": false,
+          "pressure_validated": false,
+          "stop_test_passed": false,
+          "preflight": {
+            "status": "rejected",
+            "scope": "full_cycle",
+            "failure": {
+              "reason": "ik_not_converged",
+              "point_mm": [
+                244.33706188412236,
+                18.397782043967048,
+                16.178335187406
+              ],
+              "phase": "approach",
+              "position_error_mm": 0.8868742293195653,
+              "angle_error_deg": 0.30814521417106855
+            },
+            "approach_validated": false,
+            "departure_validated": false,
+            "ready_return_validated": false,
+            "max_position_error_mm": null,
+            "simulated_duration_s": null
+          }
+        },
+        "lower_left": {
+          "text": "네",
+          "paper": {
+            "width_mm": 297,
+            "height_mm": 210,
+            "margin_mm": 8,
+            "character_mm": 28,
+            "character_gap_mm": 3,
+            "line_gap_mm": 6,
+            "pen_lift_mm": 8,
+            "sample_spacing_mm": 1
+          },
+          "kind": "writing_dynamics_rollout",
+          "status": "rejected",
+          "phase": "preflight",
+          "failure": {
+            "reason": "preflight_not_passed",
+            "detail": {
+              "reason": "ik_not_converged",
+              "point_mm": [
+                35.98768663167897,
+                101.13626800191878,
+                16.178335187406
+              ],
+              "phase": "approach",
+              "position_error_mm": 1.1828180671503714,
+              "angle_error_deg": 0.5342229586214836
+            }
+          },
+          "trajectory_complete": false,
+          "simulation_steps": null,
+          "actual_simulated_duration_s": null,
+          "max_tracking_error_mm": null,
+          "max_path_error_mm": null,
+          "max_tip_speed_mm_s": null,
+          "max_joint_speed_rad_s": null,
+          "dynamics_validated": false,
+          "motion_authorized": false,
+          "physical_calibration_required": true,
+          "physical_dynamics_validated": false,
+          "pressure_validated": false,
+          "stop_test_passed": false,
+          "preflight": {
+            "status": "rejected",
+            "scope": "full_cycle",
+            "failure": {
+              "reason": "ik_not_converged",
+              "point_mm": [
+                35.98768663167897,
+                101.13626800191878,
+                16.178335187406
+              ],
+              "phase": "approach",
+              "position_error_mm": 1.1828180671503714,
+              "angle_error_deg": 0.5342229586214836
+            },
+            "approach_validated": false,
+            "departure_validated": false,
+            "ready_return_validated": false,
+            "max_position_error_mm": null,
+            "simulated_duration_s": null
+          }
+        },
+        "lower_right": {
+          "text": "네",
+          "paper": {
+            "width_mm": 297,
+            "height_mm": 210,
+            "margin_mm": 8,
+            "character_mm": 28,
+            "character_gap_mm": 3,
+            "line_gap_mm": 6,
+            "pen_lift_mm": 8,
+            "sample_spacing_mm": 1
+          },
+          "kind": "writing_dynamics_rollout",
+          "status": "rejected",
+          "phase": "preflight",
+          "failure": {
+            "reason": "preflight_not_passed",
+            "detail": {
+              "reason": "ik_not_converged",
+              "point_mm": [
+                123.09248066950815,
+                95.71203664275265,
+                16.178335187406
+              ],
+              "phase": "approach",
+              "position_error_mm": 0.8625931201091505,
+              "angle_error_deg": 0.3086707172498922
+            }
+          },
+          "trajectory_complete": false,
+          "simulation_steps": null,
+          "actual_simulated_duration_s": null,
+          "max_tracking_error_mm": null,
+          "max_path_error_mm": null,
+          "max_tip_speed_mm_s": null,
+          "max_joint_speed_rad_s": null,
+          "dynamics_validated": false,
+          "motion_authorized": false,
+          "physical_calibration_required": true,
+          "physical_dynamics_validated": false,
+          "pressure_validated": false,
+          "stop_test_passed": false,
+          "preflight": {
+            "status": "rejected",
+            "scope": "full_cycle",
+            "failure": {
+              "reason": "ik_not_converged",
+              "point_mm": [
+                123.09248066950815,
+                95.71203664275265,
+                16.178335187406
+              ],
+              "phase": "approach",
+              "position_error_mm": 0.8625931201091505,
+              "angle_error_deg": 0.3086707172498922
+            },
+            "approach_validated": false,
+            "departure_validated": false,
+            "ready_return_validated": false,
+            "max_position_error_mm": null,
+            "simulated_duration_s": null
+          }
+        },
+        "center": {
+          "text": "네",
+          "paper": {
+            "width_mm": 297,
+            "height_mm": 210,
+            "margin_mm": 8,
+            "character_mm": 28,
+            "character_gap_mm": 3,
+            "line_gap_mm": 6,
+            "pen_lift_mm": 8,
+            "sample_spacing_mm": 1
+          },
+          "kind": "writing_dynamics_rollout",
+          "status": "rejected",
+          "phase": "preflight",
+          "failure": {
+            "reason": "preflight_not_passed",
+            "detail": {
+              "reason": "ik_not_converged",
+              "point_mm": [
+                132.90669300878272,
+                93.38415233517466,
+                16.178335187406
+              ],
+              "phase": "approach",
+              "position_error_mm": 1.0450908241252557,
+              "angle_error_deg": 0.2371443642521175
+            }
+          },
+          "trajectory_complete": false,
+          "simulation_steps": null,
+          "actual_simulated_duration_s": null,
+          "max_tracking_error_mm": null,
+          "max_path_error_mm": null,
+          "max_tip_speed_mm_s": null,
+          "max_joint_speed_rad_s": null,
+          "dynamics_validated": false,
+          "motion_authorized": false,
+          "physical_calibration_required": true,
+          "physical_dynamics_validated": false,
+          "pressure_validated": false,
+          "stop_test_passed": false,
+          "preflight": {
+            "status": "rejected",
+            "scope": "full_cycle",
+            "failure": {
+              "reason": "ik_not_converged",
+              "point_mm": [
+                132.90669300878272,
+                93.38415233517466,
+                16.178335187406
+              ],
+              "phase": "approach",
+              "position_error_mm": 1.0450908241252557,
+              "angle_error_deg": 0.2371443642521175
+            },
+            "approach_validated": false,
+            "departure_validated": false,
+            "ready_return_validated": false,
+            "max_position_error_mm": null,
+            "simulated_duration_s": null
+          }
+        },
+        "row_3": {
+          "text": "네",
+          "paper": {
+            "width_mm": 297,
+            "height_mm": 210,
+            "margin_mm": 8,
+            "character_mm": 28,
+            "character_gap_mm": 3,
+            "line_gap_mm": 6,
+            "pen_lift_mm": 8,
+            "sample_spacing_mm": 1
+          },
+          "kind": "writing_dynamics_rollout",
+          "status": "rejected",
+          "phase": "preflight",
+          "failure": {
+            "reason": "preflight_not_passed",
+            "detail": {
+              "reason": "ik_not_converged",
+              "point_mm": [
+                17.015734438789266,
+                96.15394479792701,
+                16.178335187406
+              ],
+              "phase": "approach",
+              "position_error_mm": 0.872992366288409,
+              "angle_error_deg": 0.19353187424841148
+            }
+          },
+          "trajectory_complete": false,
+          "simulation_steps": null,
+          "actual_simulated_duration_s": null,
+          "max_tracking_error_mm": null,
+          "max_path_error_mm": null,
+          "max_tip_speed_mm_s": null,
+          "max_joint_speed_rad_s": null,
+          "dynamics_validated": false,
+          "motion_authorized": false,
+          "physical_calibration_required": true,
+          "physical_dynamics_validated": false,
+          "pressure_validated": false,
+          "stop_test_passed": false,
+          "preflight": {
+            "status": "rejected",
+            "scope": "full_cycle",
+            "failure": {
+              "reason": "ik_not_converged",
+              "point_mm": [
+                17.015734438789266,
+                96.15394479792701,
+                16.178335187406
+              ],
+              "phase": "approach",
+              "position_error_mm": 0.872992366288409,
+              "angle_error_deg": 0.19353187424841148
+            },
+            "approach_validated": false,
+            "departure_validated": false,
+            "ready_return_validated": false,
+            "max_position_error_mm": null,
+            "simulated_duration_s": null
+          }
+        },
+        "row_4": {
+          "text": "네",
+          "paper": {
+            "width_mm": 297,
+            "height_mm": 210,
+            "margin_mm": 8,
+            "character_mm": 28,
+            "character_gap_mm": 3,
+            "line_gap_mm": 6,
+            "pen_lift_mm": 8,
+            "sample_spacing_mm": 1
+          },
+          "kind": "writing_dynamics_rollout",
+          "status": "rejected",
+          "phase": "preflight",
+          "failure": {
+            "reason": "preflight_not_passed",
+            "detail": {
+              "reason": "ik_not_converged",
+              "point_mm": [
+                30.896808862231595,
+                100.26858514431908,
+                16.178335187406
+              ],
+              "phase": "approach",
+              "position_error_mm": 1.194533962356784,
+              "angle_error_deg": 0.5320489064992273
+            }
+          },
+          "trajectory_complete": false,
+          "simulation_steps": null,
+          "actual_simulated_duration_s": null,
+          "max_tracking_error_mm": null,
+          "max_path_error_mm": null,
+          "max_tip_speed_mm_s": null,
+          "max_joint_speed_rad_s": null,
+          "dynamics_validated": false,
+          "motion_authorized": false,
+          "physical_calibration_required": true,
+          "physical_dynamics_validated": false,
+          "pressure_validated": false,
+          "stop_test_passed": false,
+          "preflight": {
+            "status": "rejected",
+            "scope": "full_cycle",
+            "failure": {
+              "reason": "ik_not_converged",
+              "point_mm": [
+                30.896808862231595,
+                100.26858514431908,
+                16.178335187406
+              ],
+              "phase": "approach",
+              "position_error_mm": 1.194533962356784,
+              "angle_error_deg": 0.5320489064992273
+            },
+            "approach_validated": false,
+            "departure_validated": false,
+            "ready_return_validated": false,
+            "max_position_error_mm": null,
+            "simulated_duration_s": null
+          }
+        }
+      },
+      "passed_cases": 1,
+      "total_cases": 7
+    }
+  },
+  "total_cases": 7,
+  "passed_cases": 1,
+  "rejected_cases": 6
+}

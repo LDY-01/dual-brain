@@ -63,7 +63,7 @@ def interpolate_reference(samples, times, time_s):
 
 
 def run_dynamics(plan, tool=None, frame=None, settings=None, transit=None, dynamics=None,
-                 stop_requested=None, stop_after_s=None):
+                 stop_requested=None, stop_after_s=None, progress=None):
     """Preflight the whole cycle, then drive only data.ctrl and integrate mj_step.
 
     qpos is initialized once. No state teleportation, gravity compensation, gain
@@ -224,6 +224,9 @@ def run_dynamics(plan, tool=None, frame=None, settings=None, transit=None, dynam
                                    "step_tip_speed_mm_s": step_tip_speed,
                                    "actuator_force_model_units": actual.actuator_force[actuator_ids].tolist()})
         last_tip = tip
+        if progress and (step_count == 1 or step_count % 20 == 0):
+            progress({"phase": phase, "simulation_steps": step_count, "simulation_time_s": float(actual.time),
+                      "reference_duration_s": duration, "stroke": stroke, "op": op})
         for violated, reason in checks:
             if violated:
                 fail(reason, contacts=collisions) if reason == "actual_collision" else fail(reason)

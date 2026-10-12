@@ -1,0 +1,82 @@
+{
+  "date": "2026-10-12",
+  "normal": [
+    {
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "normal_job_id": "ba786adf40f24bb4b86ca2e98b709824",
+      "black_trace_pixels": 580,
+      "passed": true
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "normal_job_id": "147198580f6e425f9079d5782081cdf9",
+      "black_trace_pixels": 580,
+      "passed": true
+    }
+  ],
+  "stop": {
+    "format_version": 1,
+    "kind": "writing_execution_job",
+    "job_id": "147ea36b9ebe4d2baea8e089151b8118",
+    "created_at": "2026-10-12T10:31:48.093685+09:00",
+    "started_at": "2026-10-12T10:31:48.107602+09:00",
+    "finished_at": "2026-10-12T10:31:51.498736+09:00",
+    "state": "stopped",
+    "mode": "simulation_only",
+    "motion_authorized": false,
+    "physical_calibration_required": true,
+    "physical_dynamics_validated": false,
+    "pressure_validated": false,
+    "text": "안녕하세요.",
+    "paper": {
+      "width_mm": 210,
+      "height_mm": 297,
+      "margin_mm": 8,
+      "character_mm": 18,
+      "character_gap_mm": 3,
+      "line_gap_mm": 6,
+      "pen_lift_mm": 8,
+      "sample_spacing_mm": 1
+    },
+    "total_strokes": 24,
+    "completed_strokes": 3,
+    "stroke_count_scope": "virtual_path_segments_not_ink_legibility",
+    "verification": "stopped",
+    "human_review": {
+      "status": "unreviewed",
+      "scope": "simulation_trace_not_physical"
+    },
+    "stop_requested": true,
+    "stop_settled": true,
+    "failure": null,
+    "wall_elapsed_s": 3.39,
+    "simulation_time_s": 11.945000000000467,
+    "progress": {
+      "phase": "stopping",
+      "simulation_steps": 2380,
+      "simulation_time_s": 11.90000000000046,
+      "reference_duration_s": 99.41919225630944,
+      "stroke": -1,
+      "op": "hold_stop"
+    },
+    "artifacts": [
+      "job.json",
+      "plan.json",
+      "config.json",
+      "events.jsonl",
+      "report.json",
+      "trace.png"
+    ],
+    "timeout_s": 120,
+    "stop_requested_at": "2026-10-12T10:31:51.090172+09:00",
+    "stop_test_passed": true
+  },
+  "cross_tab_conflict_status": 409,
+  "browser_errors": []
+}

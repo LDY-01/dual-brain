@@ -1,0 +1,23 @@
+{
+  "milestone": "M0",
+  "reviewed_on": "2026-10-12",
+  "timezone": "Asia/Seoul",
+  "reviewer": "user",
+  "scope": "planned_geometry_preview_not_robot_execution",
+  "character_mm": 28,
+  "paper_mm": [297, 210],
+  "expected_text_known": true,
+  "blind_review": false,
+  "physical_trials": 0,
+  "feedback": "받침은 확실해 괜찮아. 자동 줄바꿈도 괜찮고. 복합모음은 나쁘진않은데 궈랑 궤는 모양이 조금 달라. 그치?",
+  "cases": [
+    {"id": "large_glyphs", "text": "가 한 글", "status": "pending", "readback": null},
+    {"id": "mixed_vowels", "text": "과 괘 괴 궈 궤 귀 의", "status": "needs_revision", "affected_glyphs": ["궈", "궤"], "readback": null},
+    {"id": "finals", "text": "각 간 갇 갈 감 갑 갓 강 값 읽 앉 많", "status": "pass_user_visual_review", "readback": null},
+    {"id": "wrapped_sentence", "text": "오늘은 어떤 일을 도와드릴까요?", "status": "pass_user_visual_review", "readback": null}
+  ],
+  "milestone_status": "in_progress",
+  "robot_path_checked": false,
+  "motion_authorized": false,
+  "physical_writing_validated": false
+}

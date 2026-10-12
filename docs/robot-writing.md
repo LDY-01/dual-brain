@@ -25,6 +25,9 @@ pen-tip IK, sampled approach/writing/departure/return preflight and MuJoCo pose 
 Virtual-actuator dynamics and hold stopping are now checked for the baseline profile;
 physical motor behavior, tool mass/compliance, pressure and writing remain unvalidated.
 See the dated [simulation record](writing/simulation.md) and [dynamics results](writing/dynamics.md).
+On 2026-10-12, a bounded condition matrix and durable simulation job manager were
+added. See [the two-step results](writing/2026-10-12-progress.md); human review and
+physical validation remain pending.
 
 ```powershell
 & '.\.venv\Scripts\python.exe' -X utf8 kwon_lab/tools/writing_simulation.py --text '네' --render
@@ -78,9 +81,92 @@ persisted across reloads. Animation time and virtual paper dimensions are not
 physical measurements. See the [dated progress record](writing/README.md) for
 test results and screenshots. If the port is occupied, choose another `--port`.
 
-The default paper is A4 portrait, 210 by 297 mm, with 8 mm margins. The call
+The user-facing paper is A4 landscape, 297 by 210 mm, with 8 mm margins. The call
 response retains a 28 mm character cell. Canvas geometry uses the plan's paper
 dimensions; A4 paper size does not establish physical robot reachability.
+
+## Simulation Jobs (2026-10-12)
+
+```powershell
+& '.\.venv\Scripts\python.exe' -X utf8 kwon_lab/tools/writing_chat.py `
+  --port 8765 --records outputs/writing/jobs
+```
+
+Open `http://127.0.0.1:8765/jobs`. Enter fixed Korean text and a character cell
+size (8-40 mm) to run the existing full-cycle MuJoCo backend. This writes the
+entered text, not an AI answer. `/` remains the independent 2D call preview.
+Both pages stay loopback-only and no hardware backend is available.
+
+One simulation job may run per manager; another tab's submission returns 409.
+An OS lock gives one process ownership of the same record directory. Separate
+record directories are not a global hardware lock. Use `--config` to supply a
+complete uncalibrated simulation profile; every new job reruns full preflight.
+
+Per UUID, records contain `job.json`, `plan.json`, `config.json`, `report.json`,
+`events.jsonl` and, when samples exist, `trace.png`. The PNG projects recorded
+actual TCP segments, not planned glyphs or simulated ink. Explicit human screen
+review adds `review.json`; it never changes physical validation flags.
+Job wall duration and physics time are separate. Virtual stroke counts are
+trajectory bookkeeping, not proof of visible or readable ink.
+
+On 2026-10-12, persistent sheet IDs/occupied rows, subsequent non-overlapping
+placement, space-exhaustion blocking and explicit new-sheet confirmation were
+implemented. `pages.json` retains current and replaced sheets; each job adds
+`placement.json` and a reservation status. Layout now uses the whole A4 landscape
+paper inside its 8 mm margins (281x194 mm), independently of the unchanged
+robot candidate area. Initially that area was 142x72 mm; the 2026-10-12 follow-up
+default admits the full layout for testing and moves the virtual origin to
+(0.160, -0.070, 0.005) m. Only the 28 mm call/greeting sequence is verified;
+corners, center and later rows remain rejected by IK. This is not calibrated
+physical reach, and every execution still runs the complete safety checks.
+Preview performs layout only, not kinematic authorization; every execution reruns
+the full preflight. Font sizes are never silently reduced. Humans prepare, secure
+and replace paper; no automatic paper-changing backend is provided.
+See [paper-space policy and results](writing/paper-space.md) and
+[2026-10-12 landscape layout and failure categories](writing/a4-landscape.md).
+See [virtual paper-placement comparison and remaining limits](writing/landscape-reach.md).
+Paper overflow returns HTTP 409 with category `paper_space`. Backend reach,
+IK and actuator-control-range failures use job `failure_category=robot_reach`;
+other safety failures use `robot_validation`, and execution/storage errors use
+`execution_record`. Proven pre-integration rejection releases the unused row
+without treating the paper as full. A change from portrait requires explicit
+new-sheet confirmation; old records and their original dimensions are retained.
+
+`GET /api/page` returns the current sheet. `POST /api/page/preview` takes `text`,
+`character_mm` and an optional expected `page_id`, without reserving or executing.
+`POST /api/page/reset` requires the current ID and literal `confirmed=true`; it
+rejects active jobs and stale confirmations. The UI sends an expected sheet ID
+with every job. Omitting it is retained only for API compatibility.
+Settled partial stops retain their row. Only proven pre-integration rejection
+releases unwritten space. Unknown failures, orphan reservations and legacy jobs
+without occupancy require human sheet confirmation, never automatic reuse.
+
+Rollouts still initialize at the configured virtual ready pose. Physical recovery
+from a partial stop is not implemented. Stored rows and confirmation are logical
+state, not physical ink detection or paper registration. M0 human review and M3
+physical commissioning remain required.
+
+Normal completion, stop, failure, uncertainty and interrupted restart are distinct.
+Only a verified full virtual trajectory is `completed`. Shutdown requests a
+cooperative stop; a crash/restart marks active records `interrupted`, never
+automatically resumes them. Storage failure blocks additional jobs. Corrupt
+history fails closed. A stop during execution uses position hold, not automatic
+pen lift or a physically certified emergency stop.
+
+The default cooperative wall timeout is 120 seconds, distinct from simulated
+time. The UI lists stored jobs after reload and permits allowlisted artifact
+downloads; arbitrary filesystem access and foreign Host/Origin remain denied.
+
+```powershell
+& '.\.venv\Scripts\python.exe' -X utf8 kwon_lab/tools/writing_evaluation.py `
+  --output outputs/writing/condition-review
+& '.\.venv\Scripts\python.exe' -X utf8 -m unittest discover -s tests -p 'test_writing*.py' -v
+node tests/writing_jobs_ui.cjs
+node tests/writing_paper_ui.cjs
+```
+
+Browser checks require Node.js, Playwright and installed Edge; use `NODE_PATH`
+for the environment's module location and `WRITING_TEST_URL` for another server.
 
 ## Run
 
